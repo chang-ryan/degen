@@ -1,0 +1,45 @@
+[project]
+name = "degen"
+version = "0.1.0"
+description = "Options sizing, portfolio heat, and pre-trade checks for a speculative book."
+requires-python = ">=3.12"
+dependencies = [
+    "yfinance>=0.2.50",
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "scipy>=1.13",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+    "pytest>=8.0",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/degen"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "N", "ANN"]
+ignore = ["ANN101", "ANN102"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
