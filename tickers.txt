@@ -1,0 +1,57 @@
+# One ticker per line. Lines starting with # are ignored; inline # comments OK.
+# Active book + watchlist + the semis/power thematic basket (Inspector Lee + team).
+
+# ── Live + proposed ──
+USO
+CRM
+TEAM
+SMH                # semis ETF
+SOXX               # semis ETF
+
+# ── Watchlist (quality-on-pullback) ──
+DDOG
+SNOW
+OKTA
+
+# ── Semis: power (Inspector Lee — "next leg of semis is power semis") ──
+NVTS
+POWI
+WOLF
+VICR
+
+# ── Semis: memory ──
+MU
+STX
+SNDK
+WDC
+
+# ── Semis: logic / CPU / GPU ──
+NVDA
+AVGO
+AMD
+ARM
+MRVL
+INTC
+
+# ── Optics ──
+COHR
+LITE
+AAOI
+SIVEF              # resolves ($8 name) — confirm this is the optics name you meant
+
+# ── BTC miners → compute thesis ──
+RIOT
+MARA
+
+# ── Energy / power ──
+BE
+GEV
+CEG
+CCJ
+
+# ── Cyclicals (housing barbell vs semis) ──
+NAIL
+XHB
+
+# ── Idio / biotech (uncorrelated to momo complex) ──
+ABVX               # obefazimod Ph3 update Jun/Jul 2026 — see theses/abvx-ph3-idio.md

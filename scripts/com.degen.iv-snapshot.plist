@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily IV snapshot launchd job. Runs `uv run python -m degen.iv_store snapshot`
+  at 16:35 local time on weekdays (1=Mon ... 5=Fri), shortly after the US close
+  so Yahoo's settlement-window IV is the freshest available.
+
+  Install:
+    cp scripts/com.degen.iv-snapshot.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.degen.iv-snapshot.plist
+
+  Logs (write to ./data/logs/):
+    tail -f data/logs/iv-snapshot.out
+
+  Edit paths below if your project lives elsewhere.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.degen.iv-snapshot</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/ryanchang/.local/bin/uv</string>
+    <string>run</string>
+    <string>python</string>
+    <string>-m</string>
+    <string>degen.iv_store</string>
+    <string>snapshot</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/ryanchang/Projects/degen</string>
+
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>35</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/ryanchang/Projects/degen/data/logs/iv-snapshot.out</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ryanchang/Projects/degen/data/logs/iv-snapshot.err</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

@@ -19,6 +19,7 @@ runs it, and how to add to it.
 | Type checker | **mypy** (strict) | Catches sizing/Greeks bugs before they hit a live position. |
 | Tests | **pytest** | BS math is tested against Hull reference values. |
 | Market data | **yfinance** | Free, no API key, ~15-min delayed. Sufficient for a 2–6mo horizon. |
+| Macro data | **FRED** (public CSV endpoint) | Free, no API key. Credit spreads, financial conditions, real rates for the regime dashboard. |
 | Math | **numpy + scipy** | `scipy.stats.norm` for BS, `scipy.optimize.brentq` for implied vol. |
 | Tabular | **pandas** | yfinance returns DataFrames; we stay in them. |
 
@@ -45,9 +46,12 @@ degen/
 │
 ├── src/degen/
 │   ├── greeks.py            # Black-Scholes + Greeks + IV solver
-│   ├── data.py              # yfinance wrappers (spot, chain, history, RV)
+│   ├── data.py              # yfinance wrappers (spot, chain, history, RV, skew, earnings)
 │   ├── size.py              # CONSTITUTION sizing rules as functions
-│   └── heat.py              # portfolio heat with correlation netting
+│   ├── heat.py              # portfolio heat with correlation netting
+│   ├── iv_store.py          # SQLite IV snapshots → IV rank/percentile (self-built history)
+│   ├── dashboard.py         # per-ticker pre-trade dashboard (the gate input)
+│   └── macro.py             # portfolio-wide regime dashboard (sits above the gate)
 │
 └── tests/
     └── test_greeks.py       # BS sanity vs Hull reference values
@@ -77,6 +81,9 @@ uv run ruff check . && uv run ruff format .   # lint + format
 uv run mypy                      # type-check
 
 uv run python -m degen.heat      # ad-hoc script invocation
+uv run python -m degen.dashboard CRM TEAM   # per-ticker pre-trade dashboard(s)
+uv run python -m degen.macro     # portfolio-wide macro regime read
+uv run python -m degen.iv_store snapshot     # append today's IV snapshot to the store
 uv run python                    # REPL with the package importable
 
 uv add <pkg>                     # add a runtime dep
@@ -159,6 +166,66 @@ positions = [
 print(heat_report(positions, port_value=100_000, cap_pct=0.08))
 ```
 
+### `degen.iv_store`
+SQLite store of ~30-DTE constant-maturity ATM IV snapshots — the one input no
+free API gives you. Append one snapshot per day; after ~20 observations
+`iv_rank` / `iv_percentile` become meaningful (252-day lookback).
+
+```python
+from degen.iv_store import snapshot, iv_rank
+
+snapshot(["NVDA", "CRM"])   # append today's reading to data/iv_snapshots.db
+iv_rank("CRM")              # 0..1, or None until enough history accrues
+```
+
+CLI: `uv run python -m degen.iv_store snapshot` (reads `tickers.txt`) is wired to
+a daily launchd job in `scripts/`.
+
+### `degen.dashboard`
+Per-ticker pre-trade dashboard — the input to the gate. One block per ticker:
+spot + 30d HV, ATM IV / IV rank / IV-over-HV, 25Δ skew, term-structure slope,
+liquid-strike count, and days-to-earnings, each with a plain-language verdict.
+
+```python
+from degen.dashboard import build
+
+print(build("CRM", target_dte=120))
+```
+
+CLI: `uv run python -m degen.dashboard CRM TEAM`
+
+### `degen.macro`
+Portfolio-wide **regime** dashboard — sits *above* the per-ticker gate. It does
+not time tops; it instruments the transmission mechanism that turns "expensive"
+into forced selling, and prints one verdict — **risk-on / neutral / defensive** —
+that maps to position style (e.g. defensive → defined-risk spreads, not naked
+longs). This is the CONSTITUTION's vol rule lifted from one ticker to the book.
+
+Six signals, all no-API-key (FRED CSV + yfinance):
+
+| Signal | Source | Reads stress when |
+|---|---|---|
+| Credit (HY OAS) | FRED | spreads in top 30% of 1y range or widening ≥30bp/mo |
+| Rate vol (MOVE) | yfinance | top 30% of 1y range |
+| Equity-vol term structure (VIX/VIX3M) | yfinance | backwardated (front > 3M) |
+| Financial conditions (NFCI) | FRED | tighter than average (> 0) |
+| Real rate (10y TIPS) | FRED | rising ≥25bp/mo |
+| Breadth (RSP/SPY) | yfinance | equal-weight lagging cap-weight > 2% over 50d |
+
+```python
+from degen.macro import build
+
+print(build())   # → Regime(verdict=..., signals=...)
+```
+
+CLI: `uv run python -m degen.macro`
+
+Each feed is wrapped: any single series can time out or go empty without taking
+the dashboard down — it reads `unavailable` and drops out of the verdict
+denominator. FRED's CSV endpoint degrades per-series (some series hang while
+others return instantly), so partial reads are normal; re-run later for the full
+set.
+
 ---
 
 ## Conventions
@@ -181,6 +248,10 @@ print(heat_report(positions, port_value=100_000, cap_pct=0.08))
   by OI/volume before trusting.
 - **Risk-free rate is passed in, not fetched.** Hardcoding `r=0.04` is fine
   for 2026; revisit if the Fed moves materially.
+- **FRED's CSV endpoint degrades per-series.** Some series return in <1s while
+  others hang (504 or stalled socket). `macro.py` guards every fetch with a 10s
+  timeout and degrades to a partial read rather than hanging — a partial macro
+  verdict is expected behavior, not a bug. Re-run later for the full six signals.
 - **No live broker connection.** Positions are reconciled from Robinhood CSV
   exports (see HANDOFF §2). The code never trades.
 

@@ -72,7 +72,7 @@ def build(ticker: str, target_dte: int = 120) -> Dashboard:
     except Exception:  # noqa: BLE001
         sk = None
 
-    ts = term_structure(ticker, max_expiries=10)
+    ts = term_structure(ticker)
     slope = float(ts["atm_iv"].iloc[-1] - ts["atm_iv"].iloc[0]) if len(ts) >= 2 else None
 
     lc = liquid_chain(ticker, target)
