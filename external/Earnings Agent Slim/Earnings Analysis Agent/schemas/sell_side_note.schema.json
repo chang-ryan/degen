@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sell_side_note.schema.json",
+  "title": "sell_side_note",
+  "description": "Per-broker structured extraction of a sell-side research PDF. Produced by a dispatched general-purpose Task agent following the prompt template in sell_side_synthesizer.EXTRACTION_PROMPT_TEMPLATE. Validated by sell_side_synthesizer.aggregate() — malformed or partial extractions are surfaced as validation_failures rather than silently included.",
+  "type": "object",
+  "required": ["broker", "date"],
+  "additionalProperties": true,
+  "properties": {
+    "broker": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Broker / publisher name (e.g., 'BofA', 'Morgan Stanley', 'JPM')."
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{8}$",
+      "description": "Publication date in YYYYMMDD form (matches filename convention)."
+    },
+    "ticker": {
+      "type": ["string", "null"],
+      "description": "Ticker the note is about. Optional — sometimes omitted by extractor when filename already encodes it."
+    },
+    "analyst_names": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    },
+    "rating": {
+      "type": ["string", "null"],
+      "description": "Buy / Overweight / Hold / Neutral / Sell / Underweight / Not Rated / etc."
+    },
+    "price_target": {
+      "type": ["number", "string", "null"],
+      "description": "Numeric price target. String fallback for cases like '$X-$Y' ranges; aggregator parses defensively."
+    },
+    "prior_price_target": {
+      "type": ["number", "string", "null"]
+    },
+    "rating_change": {
+      "type": ["string", "null"],
+      "description": "raised / lowered / initiated / maintained / etc."
+    },
+    "bear_thesis_components": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "Distinct bear bullets, 1 sentence each."
+    },
+    "bull_thesis_components": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    },
+    "key_data_points": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "metric": { "type": "string" },
+          "value": { "type": ["string", "number", "boolean", "null"] },
+          "source": { "type": ["string", "null"] },
+          "context": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "q1_revenue_estimate":  { "type": ["number", "null"] },
+    "q1_ebitda_estimate":   { "type": ["number", "null"] },
+    "q2_revenue_estimate":  { "type": ["number", "null"] },
+    "q2_ebitda_estimate":   { "type": ["number", "null"] },
+    "fy_revenue_estimate":  { "type": ["number", "null"] },
+    "fy_ebitda_estimate":   { "type": ["number", "null"] },
+    "notable_arguments": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    },
+    "key_quotes": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    },
+    "topic_summary": {
+      "type": ["string", "null"]
+    }
+  }
+}

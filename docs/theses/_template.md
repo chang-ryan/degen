@@ -3,6 +3,7 @@ slug: <kebab-case-slug-matching-filename>
 ticker: <TICKER or list>
 status: proposed         # proposed | open | closed | invalidated
 opened: YYYY-MM-DD
+spot_at_open: <price at write-time — first dashboard run flags any drift loudly>
 catalyst: YYYY-MM-DD <event>
 correlation_group: <ai-semis | saas-phoenix | oil | ai-semis-hedge | ...>
 variance: <low | medium | high>

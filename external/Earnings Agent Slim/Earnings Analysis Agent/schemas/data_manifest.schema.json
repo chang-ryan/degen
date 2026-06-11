@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "data_manifest.schema.json",
+  "title": "data_manifest",
+  "description": "Per-preview manifest of every data point used in an analysis (SEC filings, manual entry, Yahoo Finance, etc.). Each entry records the source, ticker, fiscal period, metric name, value, and pulled_at timestamp. The audit gate uses this to enforce freshness (>24h is stale) and coverage (every key_metric must have an entry).",
+  "type": "object",
+  "required": ["manifest_version", "ticker", "analyst", "fiscal_period_in_focus", "created_at", "updated_at", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "enum": ["v1"]
+    },
+    "ticker": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9.-]*$",
+      "description": "Uppercase ticker symbol; allows dot/dash for dual-class (BRK.A) and ADR conventions."
+    },
+    "analyst": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fiscal_period_in_focus": {
+      "type": "string",
+      "pattern": "^C[1-4]Q[0-9]{2}$",
+      "description": "Calendar-quarter form: C{calendar_quarter}Q{year_2digit}, e.g., C1Q26."
+    },
+    "created_at": {
+      "type": "string",
+      "description": "ISO-8601 UTC timestamp of manifest creation."
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "ISO-8601 UTC timestamp of most recent append_entry call."
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/entry" }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": ["source_id", "tool_name", "ticker", "metric", "value", "pulled_at"],
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier for this entry. Convention: '{tool_name}_{metric}_{period}_{pulled_at_iso}' or any UUID. Used to deduplicate when the runner re-runs."
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source that produced this datum. Examples: sec_filing_10K, sec_filing_10Q, sec_filing_8K, yahoo_finance_prices, manual_consensus, sell_side_note. Free string but conventionally namespace-prefixed."
+        },
+        "ticker": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9.-]*$"
+        },
+        "period": {
+          "type": ["string", "null"],
+          "description": "Fiscal period this datum is for. Canonical form C{q}Q{yy} or null for period-agnostic data (e.g., calendar event date, balance sheet snapshot at a specific date)."
+        },
+        "metric": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Metric name. Convention: snake_case, optional period suffix when the metric is period-specific. Examples: consensus_revenue, consensus_eps_C1Q26, calendar_event_date, historical_actual_revenue_C1Q25."
+        },
+        "value": {
+          "description": "The actual datum. Numbers preferred for scalar metrics; structured objects/arrays accepted for compound values (e.g., a calendar event with multiple fields). The audit's freshness check does not interpret value; the figures-coverage check does, and prefers numeric primitives where possible.",
+          "anyOf": [
+            { "type": "number" },
+            { "type": "string" },
+            { "type": "boolean" },
+            { "type": "object" },
+            { "type": "array" },
+            { "type": "null" }
+          ]
+        },
+        "unit": {
+          "type": ["string", "null"],
+          "description": "Unit string for numeric values. Examples: $mm, $bn, %, bps, count. Null for non-numeric or already-encoded units."
+        },
+        "pulled_at": {
+          "type": "string",
+          "description": "ISO-8601 UTC timestamp of when the data point was obtained. Used by the freshness gate."
+        },
+        "source_url": {
+          "type": ["string", "null"],
+          "description": "Optional URL or filing-reference for primary sources (e.g., SEC filing accession number or EDGAR URL)."
+        },
+        "notes": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}

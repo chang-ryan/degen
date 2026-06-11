@@ -83,15 +83,31 @@ def atm_iv(ticker: str, expiry: str | None = None) -> float:
     return float((c["impliedVolatility"] + p["impliedVolatility"]) / 2)
 
 
-def term_structure(ticker: str, max_expiries: int = 8) -> pd.DataFrame:
-    """ATM IV across expiries. Columns: expiry, dte, atm_iv."""
+DEFAULT_DTE_LADDER = (14, 30, 60, 90, 120, 180, 365)
+
+
+def term_structure(
+    ticker: str,
+    dte_ladder: tuple[int, ...] = DEFAULT_DTE_LADDER,
+) -> pd.DataFrame:
+    """ATM IV sampled across a DTE ladder. Picks the closest available expiry to
+    each target DTE so slope reflects real term structure, not weekly noise.
+    Columns: expiry, dte, atm_iv.
+    """
+    today = date.today()
+    exps = [(datetime.strptime(e, "%Y-%m-%d").date(), e) for e in expiries(ticker)]
+    chosen: dict[str, int] = {}  # expiry -> dte (deduped)
+    for target in dte_ladder:
+        if not exps:
+            break
+        d, e = min(exps, key=lambda x: abs((x[0] - today).days - target))
+        chosen[e] = (d - today).days
     rows = []
-    for exp in expiries(ticker)[:max_expiries]:
+    for exp, dte in sorted(chosen.items(), key=lambda kv: kv[1]):
         try:
             iv = atm_iv(ticker, exp)
         except Exception:  # noqa: BLE001 — yfinance can return empty chains
             continue
-        dte = (datetime.strptime(exp, "%Y-%m-%d").date() - date.today()).days
         rows.append({"expiry": exp, "dte": dte, "atm_iv": iv})
     return pd.DataFrame(rows)
 
@@ -121,31 +137,57 @@ def skew_25d(ticker: str, expiry: str | None = None, r: float = DEFAULT_R) -> fl
 def liquid_chain(
     ticker: str,
     expiry: str | None = None,
-    min_oi: int = 500,
-    min_volume: int = 100,
-    max_spread: float = 0.20,
+    min_oi: int = 200,
+    min_volume: int = 0,
+    max_spread_pct: float = 0.10,
+    abs_spread_floor: float = 0.10,
 ) -> Chain:
-    """Filter a chain to contracts you can actually trade in size."""
+    """Filter a chain to contracts you can actually trade.
+
+    Defaults tuned for *monthly/LEAP* chains: OI is the real liquidity signal,
+    daily volume is near-zero for back-month strikes by design, and absolute
+    spread is meaningless on a $30 LEAP. We accept the wider of
+    `abs_spread_floor` or `max_spread_pct × mid`.
+    """
     ch = chain(ticker, expiry)
 
     def f(df: pd.DataFrame) -> pd.DataFrame:
+        mid = (df["bid"] + df["ask"]) / 2
         spread = df["ask"] - df["bid"]
-        keep = (df["openInterest"] >= min_oi) & (df["volume"] >= min_volume) & (spread <= max_spread)
+        allowed_spread = (mid * max_spread_pct).clip(lower=abs_spread_floor)
+        keep = (
+            (df["openInterest"] >= min_oi)
+            & (df["volume"] >= min_volume)
+            & (df["bid"] > 0)
+            & (spread <= allowed_spread)
+        )
         return df[keep].reset_index(drop=True)
 
     return Chain(expiry=ch.expiry, calls=f(ch.calls), puts=f(ch.puts))
 
 
 def next_earnings(ticker: str) -> date | None:
-    """Next earnings date, or None if yfinance doesn't have it."""
+    """Next upcoming earnings date. Uses yfinance's full history table (more
+    reliable than the `.calendar` field, which returns None for many tickers).
+    """
     try:
-        cal = yf.Ticker(ticker).calendar
+        df = yf.Ticker(ticker).get_earnings_dates(limit=8)
+    except Exception:  # noqa: BLE001 — lxml missing, network, etc.
+        return None
+    if df is None or df.empty:
+        return None
+    today = date.today()
+    upcoming = [idx.date() for idx in df.index if idx.date() >= today]
+    return min(upcoming) if upcoming else None
+
+
+def last_earnings(ticker: str, limit: int = 8) -> pd.DataFrame | None:
+    """Recent earnings table: date, EPS estimate, reported EPS, surprise %.
+    None on failure."""
+    try:
+        df = yf.Ticker(ticker).get_earnings_dates(limit=limit)
     except Exception:  # noqa: BLE001
         return None
-    if not cal:
+    if df is None or df.empty:
         return None
-    dates = cal.get("Earnings Date") if isinstance(cal, dict) else None
-    if not dates:
-        return None
-    upcoming = [d for d in dates if d >= date.today()]
-    return min(upcoming) if upcoming else None
+    return df

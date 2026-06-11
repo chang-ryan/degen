@@ -1,0 +1,132 @@
+/* Hide pandoc's auto-inserted title block — the markdown H1 IS the title. */
+header#title-block-header { display: none; }
+
+@page {
+  size: Letter;
+  margin: 0.6in 0.5in;
+  @bottom-center {
+    content: "Earnings Print Digest — Page " counter(page) " of " counter(pages);
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    color: #666;
+  }
+  @top-right {
+    content: "CONFIDENTIAL";
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    color: #999;
+  }
+}
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.35;
+  color: #1a1a1a;
+}
+h1 {
+  font-size: 16pt;
+  border-bottom: 2px solid #1a3a6e;
+  padding-bottom: 4px;
+  margin: 0 0 8px 0;
+  color: #1a3a6e;
+}
+h2 {
+  font-size: 12pt;
+  margin: 14px 0 6px 0;
+  padding: 4px 6px;
+  background-color: #1a3a6e;
+  color: white;
+  page-break-after: avoid;
+}
+h3 {
+  font-size: 10.5pt;
+  margin: 10px 0 4px 0;
+  color: #1a3a6e;
+  border-bottom: 1px solid #c7d2e0;
+  padding-bottom: 2px;
+  page-break-after: avoid;
+}
+p { margin: 4px 0 6px 0; }
+ul, ol { margin: 4px 0 6px 0; padding-left: 18px; }
+li { margin-bottom: 2px; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6px 0 8px 0;
+  font-size: 8.5pt;
+  /* Allow tables to break across pages — short tables (decision header, scorecard) typically fit on a page;
+     longer tables (Beat/Miss with many rows) will break naturally rather than getting pushed to a new page wholesale. */
+  page-break-inside: auto;
+}
+th {
+  background-color: #1a3a6e;
+  color: white;
+  padding: 4px 6px;
+  text-align: left;
+  font-weight: bold;
+  border: 1px solid #1a3a6e;
+}
+td {
+  padding: 3px 6px;
+  border: 1px solid #c7d2e0;
+  vertical-align: top;
+}
+tr:nth-child(even) td { background-color: #f4f6fa; }
+strong { color: #1a1a1a; }
+hr { border: none; border-top: 1px solid #c7d2e0; margin: 10px 0; }
+em { color: #555; }
+/* Decision header table — full width, slightly tighter cells. Apply via class .decision-table */
+table.decision-table { width: 100%; margin-bottom: 10px; font-size: 9pt; }
+table.decision-table td:first-child { width: 22%; font-weight: bold; background-color: #f4f6fa; }
+h2 + p, h2 + ul, h2 + table, h3 + p, h3 + ul, h3 + table {
+  page-break-before: avoid;
+}
+
+/* Direction / sentiment classes inherited from preview */
+.pos { color: #1f7a1f; font-weight: bold; }
+.neg { color: #c0392b; font-weight: bold; }
+.neu { color: #1a1a1a; font-weight: bold; }
+
+/* Digest-specific scorecard classes */
+.beat { color: #1f7a1f; font-weight: bold; }
+.miss { color: #c0392b; font-weight: bold; }
+.inline { color: #6c757d; font-weight: bold; }
+
+/* Guide direction */
+.guide-up { color: #1f7a1f; font-weight: bold; }
+.guide-down { color: #c0392b; font-weight: bold; }
+.guide-flat { color: #6c757d; font-weight: bold; }
+
+/* Narrative shift callouts */
+.narrative-improving { background: #e6f4ea; border-left: 4px solid #1f7a1f; padding: 8px; margin: 6px 0; }
+.narrative-deteriorating { background: #fbe9e7; border-left: 4px solid #c0392b; padding: 8px; margin: 6px 0; }
+.narrative-mixed { background: #fff8e1; border-left: 4px solid #d4a017; padding: 8px; margin: 6px 0; }
+
+/* Watch-list reconciliation */
+.absent-topic { background: #fbe9e7; border-left: 4px solid #c0392b; padding: 6px; margin: 4px 0; font-size: 8.5pt; }
+.partial-topic { background: #fff8e1; border-left: 4px solid #d4a017; padding: 6px; margin: 4px 0; font-size: 8.5pt; }
+.addressed-topic { background: #e6f4ea; border-left: 4px solid #1f7a1f; padding: 6px; margin: 4px 0; font-size: 8.5pt; }
+
+/* Q&A highlights table */
+.qa-substantive { color: #1f7a1f; }
+.qa-hedged { color: #d4a017; }
+.qa-dodged { color: #c0392b; font-weight: bold; }
+
+/* Action box (HOLD/ADD/TRIM/EXIT) */
+.action-box {
+  border: 2px solid #1a3a6e;
+  padding: 10px;
+  margin: 12px 0;
+  background: #f4f6fa;
+  font-size: 11pt;
+  page-break-inside: avoid;
+}
+
+/* Implied estimate moves */
+.estimate-move {
+  background: #f4f6fa;
+  padding: 6px;
+  margin: 4px 0;
+  border-left: 3px solid #1a3a6e;
+  font-style: italic;
+}

@@ -13,7 +13,7 @@ Right now it's a mild oil-driven stagflation, and de-escalation is the key that 
 ## Market structure — fragility high, timing unknowable
 - **Valuation:** Shiller CAPE ~41 — 2nd highest in 140+ yrs (only Dec-1999 higher). S&P ~23x fwd vs FTSE ~14x.
 - **Positioning:** prime-book momentum exposure at a record ~60%; semis crowding ~99.3% (JPM); call-buying ~2021-euphoria levels (calls ~70% of tape, puts ~30% → **downside is cheap to hedge**).
-- **Breadth:** index held up by a few names; carnage underneath (Oracle −42% from highs, Adobe −30%+). Two-sided read — could be "narrow/deteriorating" or "rotating/broadening." Watch equal-weight vs cap-weight and % > 200-DMA.
+- **Breadth:** index held up by a few names; carnage underneath (Oracle −42% from highs, Adobe −30%+). Two-sided read — could be "narrow/deteriorating" or "rotating/broadening." **Measure it index-wide (team rule, 2026-06-10):** the load-bearing breadth reads are `spx_breadth()` (% of all 503 S&P names > 50/200dma, "Breadth & systematic flows" panel in the daily brief) and RSP/SPY (regime signal). The Mag7 n/7 count is *concentration color only* — n=7 is not breadth; no rule may depend on it. F&G reads **contrarian** (deep fear = constructive for buyers, never a mechanical gate). CTA threshold distances (`cta_levels.json`, hand-entered with `asof`) date the systematic-supply phase.
 - **Stance:** condition = fragile + severe-if-it-breaks; **timing = unknowable.** Don't position for the timing. Respect it via sizing + cheap convexity. *Don't try to lid a volcano* — it can stay hot through EOY on de-escalation + cuts + capex (friend's note: secular bull intact).
 
 ## AI-capex backdrop (the engine under the high-beta complex)
@@ -40,4 +40,4 @@ Right now it's a mild oil-driven stagflation, and de-escalation is the key that 
 - June CPI — does inflation roll over and free the Fed?
 - Does net-new ARR / the agentic pivot show up in CRM/TEAM prints (the squeeze catalyst)?
 - Does the "+5% more Jira tasks from AI coding" hold as agents do issue-tracking autonomously? (TEAM long-term tell.)
-- Breadth: broadening or collapsing?
+- Breadth: broadening or collapsing? (Judge by SPX %>50dma + RSP/SPY, not the Mag7 count.)
