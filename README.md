@@ -20,8 +20,26 @@ runs it, and how to add to it.
 | Tests | **pytest** | BS math is tested against Hull reference values. |
 | Market data | **yfinance** | Free, no API key, ~15-min delayed. Sufficient for a 2–6mo horizon. |
 | Macro data | **FRED** (public CSV endpoint) | Free, no API key. Credit spreads, financial conditions, real rates for the regime dashboard. |
+| Filings | **SEC EDGAR** (public endpoints) | Free, no API key. 10-K/10-Q/8-K + exhibits for thesis validation (`degen.edgar`). |
+| Sentiment | **CNN Fear & Greed** (own API) | Free; needs browser headers. Composite + 7 sub-indicators; read contrarian. |
 | Math | **numpy + scipy** | `scipy.stats.norm` for BS, `scipy.optimize.brentq` for implied vol. |
 | Tabular | **pandas** | yfinance returns DataFrames; we stay in them. |
+
+### External data sources (complete reference)
+
+Everything is free / no-API-key. Provenance matters (see `macro.py` measurement
+principles): these are exchange-derived or institutional endpoints, not
+web-scraped figures.
+
+| Source | Endpoint | Used by | What it feeds |
+|---|---|---|---|
+| Yahoo Finance | via `yfinance` | `data.py`, `macro.py`, `daily.py`, `iv_store.py` | Spot/OHLC, options chains + IV, earnings dates, ^VIX/^VVIX/^MOVE/^GSPC/^SKEW, momentum pair ratios, Mag7, SPX-constituent batch closes |
+| FRED | `fredgraph.csv?id=` | `macro.py` | HY OAS (credit), NFCI (financial conditions), 10y TIPS (real rate), Wilshire (Buffett indicator). Per-series flakiness expected → `n/a` |
+| SEC EDGAR | `sec.gov` / `data.sec.gov` (JSON + archives) | `edgar.py` | Ticker→CIK, filing history, 10-K/10-Q/8-K primary docs **and 99-series exhibits** (earnings press releases). Output: `data/filings/{TICKER}/`. Requires identifying User-Agent (`SEC_USER_AGENT`) |
+| CNN Fear & Greed | `production.dataviz.cnn.io` | `macro.py` | F&G composite + 7 subs (browser headers required; contrarian input) |
+| Wikipedia | S&P 500 constituents page | `macro.py` (`spx_breadth`) | The 503-name list for index-wide %>50/200dma breadth (browser UA required; symbols normalized BRK.B→BRK-B) |
+| X/Twitter syndication | `cdn.syndication.twimg.com` | `daily.py` (`fetch_xpost`) | Pull public post text into daily-brief qualitative inputs |
+| Hand-entered | `cta_levels.json` | `macro.py` (`cta`) | CTA systematic-selling thresholds from team/sellside notes — can't be derived from free feeds; carries `asof`, goes stale |
 
 Deliberately **not** in the stack: real-time feeds, paid options data, broker
 APIs, backtesting frameworks, ORMs. Add only when a specific trade decision
@@ -51,7 +69,13 @@ degen/
 │   ├── heat.py              # portfolio heat with correlation netting
 │   ├── iv_store.py          # SQLite IV snapshots → IV rank/percentile (self-built history)
 │   ├── dashboard.py         # per-ticker pre-trade dashboard (the gate input)
-│   └── macro.py             # portfolio-wide regime dashboard (sits above the gate)
+│   ├── macro.py             # regime + momentum/crowding + SPX breadth + CTA + Mag7 panels
+│   ├── daily.py             # daily brief → docs/daily/YYYY-MM-DD.md (memo + panels + book)
+│   └── edgar.py             # SEC EDGAR fetcher → data/filings/{TICKER}/ (10-K/10-Q/8-K + exhibits)
+│
+├── tickers.txt              # the book + watchlist + thematic basket (daily.py input)
+├── cta_levels.json          # hand-entered CTA thresholds (asof-stamped; macro.cta)
+├── docs/                    # theses, inputs, daily briefs — INDEX.md is the table of contents
 │
 └── tests/
     └── test_greeks.py       # BS sanity vs Hull reference values
@@ -83,6 +107,8 @@ uv run mypy                      # type-check
 uv run python -m degen.heat      # ad-hoc script invocation
 uv run python -m degen.dashboard CRM TEAM   # per-ticker pre-trade dashboard(s)
 uv run python -m degen.macro     # portfolio-wide macro regime read
+uv run python -m degen.daily     # full daily brief → docs/daily/YYYY-MM-DD.md (~4 min)
+uv run python -m degen.edgar --ticker CRM   # pull 10-K/10-Q/8-K + exhibits from EDGAR
 uv run python -m degen.iv_store snapshot     # append today's IV snapshot to the store
 uv run python                    # REPL with the package importable
 
@@ -225,6 +251,37 @@ the dashboard down — it reads `unavailable` and drops out of the verdict
 denominator. FRED's CSV endpoint degrades per-series (some series hang while
 others return instantly), so partial reads are normal; re-run later for the full
 set.
+
+Beyond the regime verdict, `macro.py` also provides the daily-brief panels:
+`momentum()` (leadership-pair unwind/basing legs + VIX/VVIX), `mag7()`
+(per-name concentration color — explicitly *not* a breadth measure),
+`spx_breadth()` (% of all 503 S&P names above 50/200dma — the load-bearing
+breadth read; ~60s batch download), `cta()` (distance to hand-entered CTA
+thresholds in `cta_levels.json`), plus `fear_greed()` (contrarian),
+`buffett_indicator()`, and `cross_asset()`. Measurement principles are in the
+module docstring.
+
+### `degen.daily`
+One command for the daily brief: regime + sentiment + momentum/crowding +
+breadth/CTA + Mag7 + per-ticker book tables, written to
+`docs/daily/YYYY-MM-DD.md` with a memo placeholder (the narrative is written by
+hand/LLM each day — see `.agents/skills/daily-debrief`). Re-running
+**overwrites** the file: generate first, then write prose.
+
+CLI: `uv run python -m degen.daily` (full book from `tickers.txt`) or
+`uv run python -m degen.daily CRM TEAM` (ad-hoc focus list).
+`daily.fetch_xpost(url)` pulls public X-post text for the qualitative section.
+
+### `degen.edgar`
+Free SEC EDGAR fetcher for primary sources: resolves ticker→CIK, downloads the
+latest 10-K/10-Q and recent 8-Ks **including 99-series exhibits** (the earnings
+press release lives in Exhibit 99.1, not the 8-K stub), strips HTML to text,
+and carves out rev-rec / critical-accounting / business sections. Output lands
+in `data/filings/{TICKER}/` (gitignored) with a manifest. SEC fair-access
+policy wants an identifying User-Agent: set `SEC_USER_AGENT` (defaults to the
+repo owner's contact).
+
+CLI: `uv run python -m degen.edgar --ticker CRM --forms 10-Q,8-K --count 4`
 
 ---
 

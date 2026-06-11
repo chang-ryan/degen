@@ -8,8 +8,8 @@
 | Thesis | Ticker(s) | Status | Catalyst | Group |
 |---|---|---|---|---|
 | [CRM dinosaur re-rating](theses/crm-dinosaur-rerate.md) | CRM | proposed (revised 2026-06-03 — post-print continuation) | Sep 2 + Dec 2026 prints | saas-phoenix |
-| [Semis/optics/mem hedge](theses/semis-hedge.md) | SMH, SOXX | proposed | none (insurance) | ai-semis-hedge |
-| [Oil deflation](theses/oil-deflation.md) | USO | open | Hormuz reopening | oil |
+| Semis/optics/mem hedge — _no thesis file; see [POSITIONS.md](../POSITIONS.md)_ | SMH, SOXX | window passed (never placed — see POSITIONS 6/10 note) | none (insurance) | ai-semis-hedge |
+| Oil deflation — _no thesis file; see [POSITIONS.md](../POSITIONS.md)_ | USO | open | Hormuz reopening | oil |
 | [NAIL — housing cyclical barbell](theses/nail-housing-cyclical.md) | NAIL (express via ITB/XHB) | proposed (2026-06-09 — chase flag, await pullback) | none dated — rotation + rate-path | cyclical-rotation |
 | [ABVX post-scare Ph3 idio](theses/abvx-ph3-idio.md) | ABVX | proposed (2026-06-09 — chase flag, binary event) | June Ph3 update (lands Jun-18–Jul-17 per IV) | idio-biotech |
 
@@ -25,11 +25,13 @@ Archived theses live in [`theses/_archived/`](theses/_archived/).
 
 > Dated raw material — friend notes, sellside, news, own analyses — that fed a live thesis. Linked from the thesis itself; listed here only if loading on its own adds context this session.
 
+- [2026-06-09 — Inspector Lee: Discord notes](inputs/2026-06/2026-06-09-inspector-lee-discord-notes.md) — ABVX idio long (→ thesis), INTC core posture, GEV trim, optics CPO delay, the NAIL lose/lose.
 - [2026-06-05 — Inspector Lee: "strong data, weak stocks"](inputs/2026-06/2026-06-05-inspector-lee-strong-data-weak-stocks.md) — jobs-print selloff as the *healthier* (Scenario B) correction; flush-the-leverage thesis. Informs semis-hedge + the momo-unwind entry hunt.
+- [2026-05-26 — Inspector Lee: cyclical barbell](inputs/2026-06/2026-05-26-inspector-lee-cyclical-barbell.md) — "housing is the most cyclical sector"; the NAIL/XHB barbell call behind the NAIL thesis.
 
 ## Latest reviews
 
-- Weekly: _none yet_
+- Weekly: 2026-06-10 — MACRO.md refreshed (unwind day 3, CTA breach, Scenario B intact; full staleness audit across WATCHLIST/POSITIONS/HANDOFF)
 - Quarterly: _none yet_
 
 ---
