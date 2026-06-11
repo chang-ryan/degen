@@ -16,6 +16,10 @@ for a leveraged account, the controllable edge is risk management, not more sign
 | `WATCHLIST.md` | Candidate setups with triggers. Proactive item = the hedge. |
 | `JOURNAL.md` | Every closed trade. The edge-measurement / feedback loop. |
 | `HANDOFF.md` | This file: stack, setup, workflows, roadmap. |
+| `docs/INDEX.md` | Table of contents for theses (`docs/theses/`), inputs (`docs/inputs/`), daily briefs (`docs/daily/`). |
+| `tickers.txt` | The book + watchlist + thematic basket — input to `degen.daily` and the IV store. |
+| `cta_levels.json` | Hand-entered CTA thresholds (asof-stamped) → `macro.cta()`. |
+| `.agents/skills/daily-debrief/` | The daily-debrief skill: run `degen.daily`, write the memo, fold qualitative inputs. |
 
 **Start every session by loading `CONSTITUTION.md` + `MACRO.md` + `POSITIONS.md`** so Claude has the rules, the worldview, and the live book in context.
 
@@ -39,14 +43,19 @@ You don't need real-time feeds. Spend only where it matters for options (vol/flo
 
 ---
 
-## 3. Workflows to build (as Claude Code skills / slash-prompts)
+## 3. Workflows (skills / scripts — status as of 2026-06-10)
 Each is a reusable prompt or script that enforces the constitution.
 
-1. **`pre-trade`** — input: ticker, thesis, catalyst, structure idea. Output: runs the CONSTITUTION gate (invalidation set? defined-risk? expiry past catalyst? not chasing a parabola?), pulls IV context (UW), computes **size** from the rules, prints **max loss / max payoff / breakevens**, checks **heat** with correlated names netted. Returns PASS/FAIL + the POSITIONS.md block to paste.
-2. **`size`** — position-sizing calculator. Defined-risk: premium = 1–2% of port. Naked/margin: solve notional so a 2–3σ adverse gap ≤ ~5% of port (needs underlying vol input).
-3. **`heat`** — portfolio risk report. Aggregate max-loss, Greeks, concentration by thesis/correlation group, and a scenario stress ("semis −15% overnight: what does the whole book do, longs + hedge together?").
-4. **`weekly`** — refresh MACRO.md + POSITIONS.md, recompute heat, flag any breach, list catalysts in the next 2 weeks.
-5. **`journal`** — on close, append a JOURNAL.md entry from the template and update the quarterly rollup.
+**Built:**
+- **`daily-debrief`** (skill, `.agents/skills/daily-debrief/`) — runs `degen.daily` (regime, momentum/crowding, SPX breadth + CTA, Mag7 concentration, book tables), then the LLM writes the team memo and folds qualitative inputs. The de facto daily driver.
+- **`size` / `heat`** — `degen.size`, `degen.heat` (Python, per CONSTITUTION rules).
+- **Per-ticker gate input** — `degen.dashboard`; **regime layer** — `degen.macro`; **IV history** — `degen.iv_store` (launchd snapshot job in `scripts/`).
+- **Primary sources** — `degen.edgar` (SEC filings + exhibits → `data/filings/`; used to close the CRM Agentforce gate from the actual press release).
+
+**Still to build:**
+1. **`pre-trade`** — input: ticker, thesis, catalyst, structure idea. Output: runs the CONSTITUTION gate (invalidation set? defined-risk? expiry past catalyst? not chasing a parabola?), pulls IV context, computes **size**, prints **max loss / max payoff / breakevens**, checks **heat** netted. Returns PASS/FAIL + the POSITIONS.md block. (Pieces all exist; needs the wrapper.)
+2. **`weekly`** — refresh MACRO.md + POSITIONS.md, recompute heat, flag breaches, list catalysts in the next 2 weeks. (Done by hand 2026-06-10; codify it.)
+3. **`journal`** — on close, append a JOURNAL.md entry from the template and update the quarterly rollup.
 
 ---
 
@@ -76,5 +85,8 @@ Each is a reusable prompt or script that enforces the constitution.
 
 ---
 
-## 7. Immediate open thread to resume in Claude Code
-**Spec the semis/optics/mem PUT hedge** — strikes, expiries, and size as real insurance against the long-term equity book (WDC/SNDK/STX/GEV + AVGO/ARM/AMD/NVDA) and the correlated phoenix longs. The friend's note argues for doing this **sooner and possibly larger** given corroboration. Pick up here.
+## 7. Immediate open threads to resume in Claude Code (2026-06-10)
+1. **USO July legs (150P/145P 7/17) — bank or hold, this week.** Theta accelerating, re-escalation up-tail moving (helicopter incident); Sept leg holds either way. See POSITIONS.
+2. **Ingest the June CPI print (~6/10)** into MACRO.md — it gates the whole de-escalation→Fed chain.
+3. **Run the tranche plan:** watch for QQQ 670-680 / a momo leg basing / credit cracking. Tranche 1 = index put spreads; tranche 2 = CRM spreads (gate confirmed) + MU. See WATCHLIST.
+4. _Closed thread (lesson logged in POSITIONS):_ the semis hedge was never specced and the de-gross happened — insurance window passed; re-spec only if the book re-grosses post-flush.

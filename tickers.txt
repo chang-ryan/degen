@@ -37,7 +37,7 @@ INTC
 COHR
 LITE
 AAOI
-SIVEF              # resolves ($8 name) — confirm this is the optics name you meant
+SIVEF              # confirmed correct ticker (optics)
 
 # ── BTC miners → compute thesis ──
 RIOT
