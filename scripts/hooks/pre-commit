@@ -1,7 +1,15 @@
 #!/bin/sh
-# degen pre-commit guardrail: block commits that leak live-book personal info.
+# degen pre-commit guardrail: block commits that fail lint OR leak personal info.
 # Install:  ln -sf ../../scripts/hooks/pre-commit .git/hooks/pre-commit
 # (or `cp`). Bypass once with `git commit --no-verify` if you're sure.
+
+uv run ruff check . || {
+  echo "
+commit blocked: ruff found lint errors. Fix them (or 'uv run ruff check . --fix'),
+or re-run with --no-verify if intentional." >&2
+  exit 1
+}
+
 uv run python scripts/privacy_scan.py || {
   echo "
 commit blocked by privacy scan. Scrub the personal numbers (keep the analysis),

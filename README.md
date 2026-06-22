@@ -109,10 +109,12 @@ framework (`CONSTITUTION.md` — account specifics scrubbed), the worldview
 First-time setup: `cp POSITIONS.example.md POSITIONS.md` (and the same for the
 others), then fill them in. They'll stay out of git.
 
-**Guardrail:** `scripts/privacy_scan.py` greps tracked + about-to-be-committed
-files for live-book leakage (dollar P&L, net-worth/account references, `$Nk`
-book sizes) and exits non-zero on a hit. Wire it as a pre-commit hook so it
-can't regress:
+**Guardrail:** the pre-commit hook (`scripts/hooks/pre-commit`) blocks a commit
+on **either** a `ruff` lint failure **or** a privacy-scan hit.
+`scripts/privacy_scan.py` greps tracked + about-to-be-committed files for
+live-book leakage (dollar P&L, net-worth/account references, `$Nk` book sizes,
+plus any exact literals in gitignored `data/privacy_terms.txt`). Wire it once so
+it can't regress:
 
 ```bash
 ln -sf ../../scripts/hooks/pre-commit .git/hooks/pre-commit
