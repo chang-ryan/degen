@@ -655,6 +655,85 @@ def memory_prices() -> MemoryPrices | None:
         return None
 
 
+# ---------- AI ROI coverage (the Clock-A numerator) ----------
+# The blind spot: ai_demand() tracks the PRICE side (intelligence commoditizing —
+# the Jevons denominator). This tracks the REVENUE side — lab ARR run-rates vs
+# aggregate hyperscaler capex — the thing that answers "is paid demand catching the
+# spend before credit cracks (Clock B)." Free feeds can't see ARR/capex, so it's
+# hand-entered (roi_coverage.json). The honesty check is exogenous-vs-circular:
+# circular ARR (NVDA->OpenAI->Azure->NVDA, vendor-financed) inflates the numerator
+# without anchoring it in end-customer value. See ai-infra-cycle-top.md (two clocks).
+
+_ROI_FILE = Path("roi_coverage.json")
+
+
+@dataclass(frozen=True, slots=True)
+class RoiCoverage:
+    asof: str | None
+    total_arr: float | None  # $B, sum of lab run-rates
+    capex: float | None  # $B, aggregate annual
+    coverage: float | None  # total_arr / capex
+    exo_coverage: float | None  # exogenous-only coverage (strips circular_pct)
+    circular_pct: float | None  # est. share of ARR that's AI-internal/vendor-financed
+    arr_growth: float | None  # ARR growth vs prior period
+    capex_growth: float | None  # capex growth vs prior period
+    vol_growth: float | None  # token-volume growth (Jevons numerator), optional
+    labs: tuple[tuple[str, float], ...]  # (name, arr_b) for display
+    note: str | None
+
+    @property
+    def closing(self) -> bool | None:
+        """Is the ROI gap narrowing? ARR growing faster than capex = Clock A catching up."""
+        if self.arr_growth is None or self.capex_growth is None:
+            return None
+        return self.arr_growth > self.capex_growth
+
+
+def roi_coverage() -> RoiCoverage | None:
+    """Lab ARR vs aggregate capex — the AI-ROI coverage gauge (hand-entered)."""
+
+    def _growth(latest: float | None, prior: float | None) -> float | None:
+        return (latest / prior - 1) if (latest and prior) else None
+
+    try:
+        cfg = json.loads(_ROI_FILE.read_text())
+        capex = cfg.get("capex", {})
+        labs_raw = cfg.get("labs", [])
+
+        labs = [
+            (str(la.get("name", "?")), float(la["arr_b"])) for la in labs_raw if la.get("arr_b")
+        ]
+        total_arr = sum(a for _, a in labs) or None
+        prior_arr = (
+            sum(float(la["prior_arr_b"]) for la in labs_raw if la.get("prior_arr_b")) or None
+        )
+
+        cap = float(capex["annual_b"]) if capex.get("annual_b") else None
+        prior_cap = float(capex["prior_annual_b"]) if capex.get("prior_annual_b") else None
+
+        circ = cfg.get("circular_pct")
+        circ = float(circ) if circ is not None else None
+        coverage = (total_arr / cap) if (total_arr and cap) else None
+        exo = (total_arr * (1 - circ) / cap) if (total_arr and cap and circ is not None) else None
+
+        vol = cfg.get("token_volume", {})
+        return RoiCoverage(
+            asof=cfg.get("asof"),
+            total_arr=total_arr,
+            capex=cap,
+            coverage=coverage,
+            exo_coverage=exo,
+            circular_pct=circ,
+            arr_growth=_growth(total_arr, prior_arr),
+            capex_growth=_growth(cap, prior_cap),
+            vol_growth=_growth(vol.get("idx"), vol.get("prior_idx")),
+            labs=tuple(labs),
+            note=cfg.get("note"),
+        )
+    except Exception:
+        return None
+
+
 # ---------- crypto / AI-infra credit gauge ----------
 # The MSTR/Strategy capital structure is the leverage node of the BTC-treasury
 # complex and a *dress rehearsal* for AI-infra leverage (leverage against volatile

@@ -434,6 +434,42 @@ def _ai_demand_block(d: AiDemand | None) -> list[str]:
     ]
 
 
+def _roi_coverage_block(r: macro.RoiCoverage | None) -> list[str]:
+    if r is None:
+        return ["  roi coverage: n/a (add roi_coverage.json — see roi_coverage.example.json)"]
+
+    def p(x: float | None, fmt: str = "+.0%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    labs = ", ".join(f"{n} ${a:.0f}B" for n, a in r.labs) or "—"
+    arr = f"${r.total_arr:.0f}B" if r.total_arr is not None else "—"
+    cap = f"${r.capex:.0f}B" if r.capex is not None else "—"
+    cov = f"{r.coverage:.0%}" if r.coverage is not None else "—"
+    exo = f"{r.exo_coverage:.0%}" if r.exo_coverage is not None else "—"
+    circ = f"{r.circular_pct:.0%}" if r.circular_pct is not None else "—"
+    if r.closing is True:
+        race = "ARR outgrowing capex → Clock A closing the gap (on paper)"
+    elif r.closing is False:
+        race = "capex outgrowing ARR → ROI gap WIDENING (supply ahead of paid demand)"
+    else:
+        race = "growth read incomplete"
+    out = [
+        f"  lab ARR        : {arr} ({labs})  growth {p(r.arr_growth)}",
+        f"  vs capex       : {cap}/yr  growth {p(r.capex_growth)}",
+        f"  coverage       : {cov} of capex  (exogenous {exo}, ~{circ} circular)",
+    ]
+    if r.vol_growth is not None:
+        out.append(
+            f"  token volume   : {p(r.vol_growth)} (Jevons numerator — must outrun price fall)"
+        )
+    out.append(
+        f"  read: {race}. Coverage = headline; exogenous-vs-circular = honesty check "
+        "(circular = NVDA→OpenAI→Azure→NVDA, inflates ARR without anchoring it). "
+        f"asof {r.asof}."
+    )
+    return out
+
+
 # ---------- delta snapshots (atlas-brief idea: a "what changed" lede) ----------
 
 SNAP_DIR = Path("data/snapshots")
@@ -607,6 +643,7 @@ def build_brief(
     dist = macro.distribution()
     froth = macro.retail_froth()
     aid = ai_demand()
+    roi = macro.roi_coverage()
 
     # delta snapshot: load yesterday's state, compute "what changed", persist today's
     today = date.today()
@@ -658,6 +695,10 @@ def build_brief(
         "## AI-infra demand (commoditization)",
         "```",
         *_ai_demand_block(aid),
+        "```",
+        "## AI ROI coverage (revenue vs capex — Clock A)",
+        "```",
+        *_roi_coverage_block(roi),
         "```",
         "## Memory super-cycle (price-hike tracker)",
         "```",

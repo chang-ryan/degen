@@ -11,7 +11,7 @@ import importlib.util
 import pathlib
 
 from degen.ai_demand import _mtok
-from degen.macro import ConsumerHealth, CryptoCredit, Distribution
+from degen.macro import ConsumerHealth, CryptoCredit, Distribution, RoiCoverage
 
 
 def _cc(strc: float | None) -> CryptoCredit:
@@ -63,6 +63,20 @@ def test_distribution_wedge_and_capital() -> None:
     assert _dist(0.01, 0.03, 0.01).gap < 0  # pay outruns productivity
     assert _dist(0.03, 0.01, 0.02).to_capital is False  # wedge>0 but labor share rising
     assert _dist(None, 0.01, -0.02).gap is None
+
+
+def _roi(arr_g: float | None, cap_g: float | None) -> RoiCoverage:
+    return RoiCoverage(
+        asof="2026-06-22", total_arr=54.0, capex=400.0, coverage=0.135,
+        exo_coverage=0.088, circular_pct=0.35, arr_growth=arr_g, capex_growth=cap_g,
+        vol_growth=None, labs=(("OpenAI", 30.0), ("Anthropic", 24.0)), note=None,
+    )
+
+
+def test_roi_coverage_closing() -> None:
+    assert _roi(1.50, 0.60).closing is True  # ARR outgrowing capex → gap closing
+    assert _roi(0.20, 0.60).closing is False  # capex outrunning ARR → gap widening
+    assert _roi(None, 0.60).closing is None
 
 
 def test_mtok_pricing_conversion() -> None:
