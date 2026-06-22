@@ -763,6 +763,8 @@ _CONSUMER_SERIES = {
     "savings": ("PSAVERT", 12),  # personal saving rate (%) — the stretch
     "revolving": ("REVOLSL", 12),  # revolving consumer credit — the borrowing
     "cc_delinq": ("DRCCLACBS", 4),  # credit-card delinquency rate (%, quarterly) — the crack
+    "debt_service": ("TDSP", 4),  # household debt-service ratio (% of DPI, quarterly) — the stretch
+    "claims": ("ICSA", 13),  # initial jobless claims (weekly) — the labor-migration tell
     "sentiment": ("UMCSENT", 12),  # UMich consumer sentiment — the soft leading read
 }
 
@@ -775,6 +777,10 @@ class ConsumerHealth:
     revolving_yoy: float | None  # revolving credit growth YoY
     cc_delinq: float | None  # credit-card delinquency rate, %
     cc_delinq_chg: float | None  # delinquency change vs ~1yr ago, pp (rising = cracking)
+    debt_service: float | None  # household debt-service ratio, % of DPI (the stretch)
+    debt_service_chg: float | None  # change vs ~1yr ago, pp (rising = more income to debt)
+    claims: float | None  # initial jobless claims, weekly level (the labor-migration tell)
+    claims_chg: float | None  # change vs ~13 weeks ago (rising = bottom-half stress → labor)
     sentiment: float | None
     resolved: int  # FRED series that fetched live (pipeline health)
     total: int
@@ -829,16 +835,22 @@ def consumer_health() -> ConsumerHealth:
             stale.append(sid)
         vals[key] = (latest, prior)
 
-    cc_latest, cc_prior = vals["cc_delinq"]
+    def _diff(pair: tuple[float | None, float | None]) -> float | None:
+        latest, prior = pair
+        return (latest - prior) if (latest is not None and prior is not None) else None
+
+    cc_latest, _ = vals["cc_delinq"]
     return ConsumerHealth(
         pce_yoy=_yoy(*vals["real_pce"]),
         dpi_yoy=_yoy(*vals["real_dpi"]),
         savings=vals["savings"][0],
         revolving_yoy=_yoy(*vals["revolving"]),
         cc_delinq=cc_latest,
-        cc_delinq_chg=(
-            (cc_latest - cc_prior) if (cc_latest is not None and cc_prior is not None) else None
-        ),
+        cc_delinq_chg=_diff(vals["cc_delinq"]),
+        debt_service=vals["debt_service"][0],
+        debt_service_chg=_diff(vals["debt_service"]),
+        claims=vals["claims"][0],
+        claims_chg=_diff(vals["claims"]),
         sentiment=vals["sentiment"][0],
         resolved=resolved,
         total=total,

@@ -347,12 +347,25 @@ def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
         else "—"
     )
     out.append(f"  CC delinquency : {delinq}   UMich sentiment {p(c.sentiment, '.0f')}")
+    ds = (
+        f"{c.debt_service:.1f}% of DPI ({p(c.debt_service_chg, '+.2f')}pp/yr)"
+        if c.debt_service is not None
+        else "—"
+    )
+    if c.claims is not None:
+        chg_k = c.claims_chg / 1000 if c.claims_chg is not None else None
+        claims = f"{c.claims / 1000:.0f}k ({p(chg_k, '+.0f')}k/qtr)"
+    else:
+        claims = "—"
+    out.append(f"  debt service   : {ds}   initial claims {claims}")
     health = f"FRED {c.resolved}/{c.total} live"
     if c.stale:
         health += f", stale {','.join(c.stale)}"
     out.append(
-        f"  read: spend>income + low savings = the consumer-funded leg of AI is stretched; "
-        f"ad-rev growth is the real-time tell.  [{health}]"
+        "  read: spend>income + low savings + rising debt-service = the consumer-funded leg is "
+        "stretched (ad-rev growth = real-time tell). The bridge to Clock B: bottom-half "
+        "delinquency → climbing into prime → initial claims turning up (labor migration) → "
+        f"HY OAS widening (regime panel) = the credit trigger releasing.  [{health}]"
     )
     return out
 

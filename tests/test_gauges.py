@@ -38,7 +38,8 @@ def test_crypto_stress_trigger() -> None:
 def _consumer(pce: float | None, dpi: float | None) -> ConsumerHealth:
     return ConsumerHealth(
         pce_yoy=pce, dpi_yoy=dpi, savings=None, revolving_yoy=None,
-        cc_delinq=None, cc_delinq_chg=None, sentiment=None, resolved=0, total=6, stale=(),
+        cc_delinq=None, cc_delinq_chg=None, debt_service=None, debt_service_chg=None,
+        claims=None, claims_chg=None, sentiment=None, resolved=0, total=8, stale=(),
     )
 
 
