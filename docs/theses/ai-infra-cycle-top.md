@@ -27,6 +27,9 @@ variance: the whole-book tail
 
 **Score: 5/5 — except the catalyst/timing, which is unknowable.** That's the whole point: every structural box is checked; only the trigger is unforecastable. So you manage risk, you don't predict the date.
 
+### Sentiment readings (dated — the human is the sensor)
+- **2026-06-22:** Box #4 intensifying. Non-traders are starting to trade — and now **on *options*, not just equities** (the sketchier escalation; retail call-buying is what's inflating the memory IV). Showing up in the channel too (P&L brags, random small-cap pumps). **And the tell that matters: the structural bull (Inspector Lee) said "buying looks exhausted," trimmed leverage, flat on the day** into the memory print. Smart money de-risking into strength while dumb money piles into calls — the classic late-cycle divergence. *Reading:* late-cycle melt-up confirmed, not timed (1999 ran ~12-18mo of retail euphoria before the top). Raises the urgency of the trim-parabolas/hold-powder/watch-credit posture; does **not** justify a short. Euphoria makes the eventual fall bigger; it doesn't ring the bell.
+
 ## The bull steelman (hold this against the boxes — Inspector Lee, 2026-06-22)
 The boxes are the bear case; honesty requires the counterweight, which is *coherent*:
 - **It's not 2000 — earnings-driven, not multiple-driven.** Forward-PE growth *into today*
@@ -34,6 +37,16 @@ The boxes are the bear case; honesty requires the counterweight, which is *coher
   earnings, not multiple expansion, and the leaders have real cash flow (vs pets.com). →
   pushes the magnitude/duration read toward the *milder* valuation-reset side, **not** 2000/2008
   — *if credit holds*.
+  - **Rebuttal (the dotcom parallel the metrics miss):** the valuation comparison is the *wrong* axis.
+    The 2000 infra (fiber, the internet) was *also* real and enabling, and Cisco/Intel/MSFT were *also*
+    profitable — and it *still* crashed 50-80% **before** the value was realized. The internet's killer
+    apps (gig/sharing — Uber/DoorDash/Airbnb, cloud, mobile, streaming) emerged ~a *decade later*, and
+    largely via *different* players who bought the distressed assets. The crash happened in the **gap
+    between the infra buildout (greed/capex) and the applications that monetize it (value, lagged).**
+    For AI: the infra/productivity is real, but *what it enables at scale is "yet to be seen"* — so
+    "leaders are profitable + the buildout is real" does **not** prevent a correction; the correction
+    lands in the application-lag gap. **True economic value lags the greed.** (This is the dark-fiber
+    argument; the "not 2000" comfort is about *valuation*, not *timing*, and timing is the risk.)
 - **Buy the suppliers, not the buyers.** Even if the hyperscalers (the buyers) de-rate, the
   **memory/optics/photonics suppliers capture the capex** the buyers spend. The picks-and-shovels
   can keep working *through* a buyer de-rate — which is exactly the Mag7-rolling-while-semis-rip
@@ -51,6 +64,16 @@ The boxes are the bear case; honesty requires the counterweight, which is *coher
 So the play is unchanged (barbell, watch credit), but the *urgency* of de-risking the memory winners
 specifically is lower than a generic "it's a top" implies. The crux that resolves bull-vs-bear is
 **memory contract pricing** — see the gauge in [[2026-06-22-inspector-lee-memory-supercycle-oil-warsh]].
+
+## Adversarial check — where this whole thesis is wrong (CONSTITUTION §4)
+The boxes + the demand/dark-fiber case are *our* thesis, built with the human talking his own (cautious) book. Steelman the side that says we're wrong:
+- **It's been P&L-wrong, and "early" is a cost.** "5/5 boxes, correction coming" has coexisted with a melt-up the entire time. Acting on it (de-risking) would have *missed huge gains*; the user is up large *because* he stayed long. A coherent bear case that's been wrong for the duration is a **cost to weight, not a badge.** At what point is "the catch-up won't be in time" an unfalsifiable permabear stance?
+- **AI is *already* monetizing — unlike 2000.** The dotcom rebuttal cuts both ways: 2000 had companies with *no revenue*; the labs are at ~$30B/$24B ARR growing fast, agentic coding is burning real enterprise budgets (Uber's 4-month budget burn). "What's enabled is yet to be seen" is *partly false* — it's showing up in revenue *now*. The value lag may be far shorter than dark fiber's decade.
+- **The consumer-crack read is contradicted by its own hardest metric.** Savings rate at 2.6% has screamed "consumer about to break" for *years* while spending held — it's noisy and heavily revised. The K-shape means aggregate stats mislead (the asset-rich top 40% do most of the spending and are flush). And **delinquencies are *down* −0.14pp/yr** — the one hard-crack gauge is *easing*, not breaking. We may be pattern-matching doom into a soft series.
+- **Timing could be off by years if oil/inflation cooperate.** Oil *is* deflating (USO −13%/5d). If the inflation overhang lifts, the policy put un-constrains and the melt-up extends (1995→2000 ran *five more years* after "it's expensive" calls began). "Correction before catch-up" could be right in direction and years early — and years early in a melt-up is ruinous to returns.
+- **Base rate:** cycle-top calls are early by 1-3yr on average, and the final melt-up is often the biggest gains.
+
+**What would flip us *off* the cautious lean:** credit stays dead-calm through an actual hyperscaler capex *guide-down*; AI-attributable revenue inflects up toward capex (ROI gap closing); the consumer's *income* leg turns positive (real DPI > 0) while delinquencies stay low. **What confirms it:** credit cracks (STRC/HY OAS) *or* ad-rev growth rolls over *while* the consumer is credit-stretched. **The honest posture this forces:** the thesis earns a *hedge + sizing discipline*, **not** a reduction in the long — and we should log in JOURNAL whether the cautious lean has cost P&L, because so far it has.
 
 ## The leverage — confirmed, and where to look
 - **Private credit is the epicenter.** Blackstone, Blue Owl, Apollo, PIMCO, BlackRock originate most datacenter debt, much of it **off-balance-sheet via SPVs** (opaque by design). AI-related private-credit loans went ~0 → **$200B+** in a few years.
@@ -117,6 +140,17 @@ in 4 months as coding-agent adoption went 32%→84%). It's **three separate ques
 | **Hyperscaler capex *guides*** | a trim citing "optimizing AI spend" = the demand-doubt crack | manual (earnings) |
 
 The honest prior (per the operating model — this is a *hypothesis to monitor*, not a verdict): the value likely **doesn't** match the infra spend in the current timeframe (the ROI gap, labs unprofitable to 2030, dark-fiber timing). These gauges are how we'd *know it's resolving* (volume compounding, labs' losses inflecting) vs *worsening* (volume stalls, or revenue decouples upward from volume = circular).
+
+## The funding base bottoms out at the consumer — and the catch-up won't be in time
+Trace the AI dollar end-to-end and it bottoms out in three places: **the consumer** (hyperscaler ad/retail rev — Meta ~98% ads, Google ~75%, Amazon retail), **government**, and **the AI-internal capital-markets-funded circularity** (NVDA→OpenAI→neocloud→NVDA, funded by equity/debt, not cash flows). Even the "enterprise IT" half recurses to the consumer (AWS/Azure → SaaS → companies whose end-markets are consumers). The *untethered, fragile* dollar is the third one — it runs on capital-market faith, not revenue.
+
+**The value question, three ways:** value *created* (productivity — real) ≠ value *captured* (margins) ≠ value *distributed* (to consumers as income or lower prices). The macro risk is value created but **not distributed** → "do more with less" cuts labor cost into margins, displaced income falls, and the consumer demand base that funds the ad rev erodes. The productivity boom can starve the demand it depends on.
+
+**The crystallization (the dark-fiber argument, demand-side):** capex spend = a real productivity boom = **but a productivity boom of *what*, monetized *when*?** The supply (capex/intelligence) is being built years ahead of the economy's ability to reallocate labor, distribute the gains, and generate the demand to absorb it. **Markets/humanity won't catch up to the productivity boom in time — so the correction comes *before* the catch-up, not after.** Same shape as dark fiber: the demand thesis is right, the timing kills the over-levered builders first.
+
+**The live consumer read corroborates the stretch** (gauge: `macro.consumer_health()`, in the daily brief): real spending is **growing while real income is *falling*** (PCE +YoY vs DPI −YoY, a positive "spending-outruns-income" gap), the savings rate is near record lows, and it's sustained on revolving credit. The consumer-funded leg is being held up on borrowing, not income — exactly the late-cycle stretch.
+- **The cleanest real-time tell: hyperscaler ad-revenue growth.** Ad budgets lead consumer demand (cut first in a slowdown). Decelerating Meta/Google ad rev while capex keeps doubling = supply outrunning the consumer demand that funds it — the chain breaking in their own prints.
+- **The demand-side abort (distinct from the credit-event/STRC trigger):** savings exhausted + delinquencies spiking → credit-funded spending rolls over → ad rev rolls over → the AI funding base erodes.
 
 ## The play (barbell — none of it requires calling the top)
 1. **Protect the parabolic winners — the most-extended single name is the #1 decision.** Take a chunk off (literally pull cost basis + profit off the table = play with house money) and/or **collar** the rest (sell upside call to finance a protective put). You don't have to call the top to lock a life-changing gain. *Note: odd-lot share counts can't be cleanly collared — trim, or hedge the cluster via SMH/SOXX puts; size off the live POSITIONS.md.*

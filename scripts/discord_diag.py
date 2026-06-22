@@ -4,7 +4,7 @@ import asyncio
 
 import discord
 
-from degen import discord_log as dl
+from degen.ingest import discord_log as dl
 
 
 async def run() -> None:

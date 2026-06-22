@@ -28,10 +28,10 @@ Setup (one time):
   4. List the channel ids in `discord_channels.json`:  {"channels": [123, 456]}
      (both files are gitignored)
 
-  uv run python -m degen.discord_log pull                       # since last stored
-  uv run python -m degen.discord_log backfill --since 2026-01-01
-  uv run python -m degen.discord_log recent --author "Inspector Lee" --days 7
-  uv run python -m degen.discord_log digest --days 1            # markdown for the daily brief
+  uv run python -m degen.ingest.discord_log pull                # since last stored
+  uv run python -m degen.ingest.discord_log backfill --since 2026-01-01
+  uv run python -m degen.ingest.discord_log recent --author <handle> --days 7
+  uv run python -m degen.ingest.discord_log digest --days 1     # markdown for the daily brief
 """
 
 from __future__ import annotations

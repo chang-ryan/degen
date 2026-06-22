@@ -744,6 +744,126 @@ def crypto_credit() -> CryptoCredit:
     )
 
 
+# ---------- consumer health (the demand base that ultimately funds AI) ----------
+# Almost every AI-funding dollar traces back to the consumer (ad rev, retail) or to
+# capital markets (the untethered, fragile part). This panel instruments the consumer
+# leg: is spending real (income-driven) or borrowed (credit + falling savings), and is
+# the credit cracking. FRED is per-series flaky, so each metric is independently guarded
+# AND last-good-cached (data/fred_cache.json) — a transient FRED failure shows the cached
+# value flagged stale, not n/a.
+
+_FRED_CACHE = Path("data/fred_cache.json")
+
+# key -> (FRED series id, periods-ago for the YoY/Δ: 12 monthly, 4 quarterly)
+_CONSUMER_SERIES = {
+    "real_pce": ("PCEC96", 12),  # real personal consumption — the spending leg
+    "real_dpi": ("DSPIC96", 12),  # real disposable income — the income leg
+    "savings": ("PSAVERT", 12),  # personal saving rate (%) — the stretch
+    "revolving": ("REVOLSL", 12),  # revolving consumer credit — the borrowing
+    "cc_delinq": ("DRCCLACBS", 4),  # credit-card delinquency rate (%, quarterly) — the crack
+    "sentiment": ("UMCSENT", 12),  # UMich consumer sentiment — the soft leading read
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerHealth:
+    pce_yoy: float | None  # real consumption growth YoY
+    dpi_yoy: float | None  # real disposable income growth YoY
+    savings: float | None  # saving rate, %
+    revolving_yoy: float | None  # revolving credit growth YoY
+    cc_delinq: float | None  # credit-card delinquency rate, %
+    cc_delinq_chg: float | None  # delinquency change vs ~1yr ago, pp (rising = cracking)
+    sentiment: float | None
+    resolved: int  # FRED series that fetched live (pipeline health)
+    total: int
+    stale: tuple[str, ...]  # series served from cache (FRED hiccup)
+
+    @property
+    def gap(self) -> float | None:
+        """PCE YoY minus DPI YoY; >0 = spending outrunning income (credit-funded)."""
+        if self.pce_yoy is None or self.dpi_yoy is None:
+            return None
+        return self.pce_yoy - self.dpi_yoy
+
+
+def _fred_metric(series_id: str, periods: int) -> tuple[float | None, float | None, bool]:
+    """(latest, value `periods` ago, stale). Last-good cached; falls back on FRED failure."""
+    try:
+        cache = json.loads(_FRED_CACHE.read_text())
+    except Exception:
+        cache = {}
+    try:
+        s = _fred_series(series_id).dropna()
+        latest = float(s.iloc[-1])
+        prior = float(s.iloc[-1 - periods]) if len(s) > periods else None
+        cache[series_id] = {"latest": latest, "prior": prior, "asof": str(s.index[-1].date())}
+        _FRED_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        _FRED_CACHE.write_text(json.dumps(cache, indent=2))
+        return latest, prior, False
+    except Exception:
+        c = cache.get(series_id)
+        if c:
+            return c.get("latest"), c.get("prior"), True
+        return None, None, False
+
+
+def consumer_health() -> ConsumerHealth:
+    """The consumer demand base — instrumented from FRED, cached against FRED's flakiness."""
+
+    def _yoy(latest: float | None, prior: float | None) -> float | None:
+        if latest is None or prior is None or prior == 0:
+            return None
+        return latest / prior - 1
+
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    resolved = total = 0
+    stale: list[str] = []
+    for key, (sid, per) in _CONSUMER_SERIES.items():
+        total += 1
+        latest, prior, is_stale = _fred_metric(sid, per)
+        if latest is not None:
+            resolved += 1
+        if is_stale:
+            stale.append(sid)
+        vals[key] = (latest, prior)
+
+    cc_latest, cc_prior = vals["cc_delinq"]
+    return ConsumerHealth(
+        pce_yoy=_yoy(*vals["real_pce"]),
+        dpi_yoy=_yoy(*vals["real_dpi"]),
+        savings=vals["savings"][0],
+        revolving_yoy=_yoy(*vals["revolving"]),
+        cc_delinq=cc_latest,
+        cc_delinq_chg=(
+            (cc_latest - cc_prior) if (cc_latest is not None and cc_prior is not None) else None
+        ),
+        sentiment=vals["sentiment"][0],
+        resolved=resolved,
+        total=total,
+        stale=tuple(stale),
+    )
+
+
+def fred_health() -> list[tuple[str, str, str]]:
+    """Ping every FRED series the brief depends on; (series_id, status, detail). The
+    pipeline validator — `uv run python -m degen.macro fred`."""
+    ids = {
+        "BAMLH0A0HYM2": "HY OAS (credit)",
+        "NFCI": "financial conditions",
+        "DFII10": "10y TIPS (real rate)",
+        "WILL5000PRFC": "Wilshire (Buffett)",
+        **{sid: key for key, (sid, _) in _CONSUMER_SERIES.items()},
+    }
+    out: list[tuple[str, str, str]] = []
+    for sid, name in ids.items():
+        try:
+            s = _fred_series(sid).dropna()
+            out.append((sid, "ok", f"{name}: {float(s.iloc[-1]):.2f} @ {s.index[-1].date()}"))
+        except Exception as e:
+            out.append((sid, "FAIL", f"{name}: {type(e).__name__}"))
+    return out
+
+
 # ---------- formatting ----------
 
 _STYLE = {
@@ -774,7 +894,18 @@ def format_regime(r: Regime) -> str:
 
 
 def main() -> None:
-    """`uv run python -m degen.macro`"""
+    """`uv run python -m degen.macro` (regime) · `... macro fred` (FRED pipeline check)."""
+    import sys
+
+    if "fred" in sys.argv[1:]:
+        print("=== FRED pipeline health ===")
+        rows = fred_health()
+        for sid, status, detail in rows:
+            mark = "ok  " if status == "ok" else "FAIL"
+            print(f"  [{mark}] {sid:14} {detail}")
+        ok = sum(1 for _, s, _ in rows if s == "ok")
+        print(f"  → {ok}/{len(rows)} series live")
+        return
     print(build())
 
 

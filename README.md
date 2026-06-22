@@ -72,8 +72,14 @@ degen/
 │   ├── iv_store.py          # SQLite IV snapshots → IV rank/percentile (self-built history)
 │   ├── dashboard.py         # per-ticker pre-trade dashboard (the gate input)
 │   ├── macro.py             # regime + momentum/crowding + SPX breadth + CTA + Mag7 panels
+│   ├── ai_demand.py         # AI-commoditization gauge ($/Mtok via OpenRouter; Jevons denom)
 │   ├── daily.py             # daily brief → docs/daily/YYYY-MM-DD.md (memo + panels + book)
-│   └── edgar.py             # SEC EDGAR fetcher → data/filings/{TICKER}/ (10-K/10-Q/8-K + exhibits)
+│   ├── edgar.py             # SEC EDGAR fetcher → data/filings/{TICKER}/ (10-K/10-Q/8-K + exhibits)
+│   ├── etrade.py            # E*TRADE OAuth — live position reconciliation → POSITIONS.md
+│   └── ingest/              # chat-derived signal (private; shares data/discord_log.db)
+│       ├── discord_log.py   # Discord channel pull → messages + charts (scheduled, idempotent)
+│       ├── calls.py         # Inspector Lee call ledger → forward-return hit rate (HITL-curated)
+│       └── catalysts.py     # curated dated events → countdown calendar in the daily brief
 │
 ├── tickers.txt              # the book + watchlist + thematic basket (daily.py input)
 ├── cta_levels.json          # hand-entered CTA thresholds (asof-stamped; macro.cta)
@@ -100,9 +106,9 @@ real positions, P&L, account info, hand-entered proprietary signal levels — is
 | `memory_prices.json` | `memory_prices.example.json` | hand-entered DRAM/NAND contract-price prints vs forecast |
 | `.env` | (see `degen.edgar` / `degen.etrade`) | API keys / tokens |
 | `data/` | — | broker tokens, IV store, snapshots, filings, **Discord log + media**, `privacy_terms.txt` |
-| `discord_channels.json` | — | Discord channel ids for `degen.discord_log` |
+| `discord_channels.json` | — | Discord channel ids for `degen.ingest.discord_log` |
 
-> **Discord log is a private input, not commit-ready.** `degen.discord_log` pulls
+> **Discord log is a private input, not commit-ready.** `degen.ingest.discord_log` pulls
 > raw channel chatter into `data/discord_log.db` — it contains third-party P&L,
 > the user's own P&L, and real handles. **Never commit the `digest` verbatim**;
 > synthesize the analysis, map handles → pseudonyms ("Inspector Lee"), strip all
@@ -314,9 +320,13 @@ breadth read; ~60s batch download), `cta()` (distance to hand-entered CTA
 thresholds in `cta_levels.json`), `crypto_credit()` (the STRC/Strategy-pref
 stack + MSTR-vs-BTC — a crypto-credit funding-stress gauge that leads the
 miners and is the dress rehearsal for AI-infra leverage; see
-`theses/mstr-strc-contagion.md`), plus `fear_greed()` (contrarian),
-`buffett_indicator()`, and `cross_asset()`. Measurement principles are in the
-module docstring.
+`theses/mstr-strc-contagion.md`), `consumer_health()` (the demand base that
+ultimately funds AI — real spending vs income, savings rate, revolving credit,
+delinquencies, from FRED; last-good-cached against FRED flakiness), plus
+`fear_greed()` (contrarian), `buffett_indicator()`, and `cross_asset()`.
+Measurement principles are in the module docstring. **FRED pipeline check:**
+`uv run python -m degen.macro fred` pings every FRED series the brief depends on
+and reports ok/FAIL/stale (it's how we caught the Wilshire/Buffett series breaking).
 
 ### `degen.daily`
 One command for the daily brief: regime + sentiment + momentum/crowding +

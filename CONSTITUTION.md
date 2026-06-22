@@ -15,6 +15,7 @@
 1. **Process > outcome.** A good process can lose; a bad process can win. We grade the process, logged in JOURNAL.md.
 2. **Capital preservation first.** The game now is protecting house money, not chasing the next multiple. The same leverage that built the book can round-trip it.
 3. **Earn the right to size up.** Do not increase size off a lucky streak. Size up only after JOURNAL.md shows a real, measured edge over enough trades.
+4. **Adversarial by default.** Every thesis must survive its own steelmanned opposite before it sizes a trade. The book-talker (you) and the agreeable assistant will both drift toward confirmation — so the standing job is to argue the *other* side, name what would prove the thesis wrong, and count whether a bearish/bullish lean has actually cost P&L. Critically constructive, never negative for its own sake: the aim is a better-tested position, not a gloomier one. (See HANDOFF §0.)
 
 ## Risk limits (the framework)
 - **Defined-risk trades** (long options / spreads, where max loss = premium): risk **1–2% of total port** per trade. Start at **1%** until edge is proven.

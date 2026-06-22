@@ -30,6 +30,9 @@ from degen.data import atm_iv, expiries, history, next_earnings, realized_vol
 FOCUS_DEFAULT = ("CRM", "TEAM", "SMH", "SOXX", "USO")  # active-thesis names get the full row
 TICKERS_FILE = Path("tickers.txt")
 BRIEF_DIR = Path("docs/daily")
+# Raw Discord digest lands here — under data/ so it's gitignored AND skipped by the
+# privacy scan. The tracked brief never gets raw chatter, only a pointer to this.
+STAGING_DIR = Path("data/discord_staging")
 
 
 # ---------- per-ticker book rows ----------
@@ -313,6 +316,31 @@ def _crypto_credit_block(c: macro.CryptoCredit) -> list[str]:
     return out
 
 
+def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    out = [
+        f"  spend vs income: real PCE {p(c.pce_yoy)} YoY vs real DPI {p(c.dpi_yoy)} YoY  "
+        f"→ gap {p(c.gap)} (>0 = spending outrunning income = credit-funded)",
+        f"  savings rate   : {p(c.savings, '.1f')}%   revolving credit {p(c.revolving_yoy)} YoY",
+    ]
+    delinq = (
+        f"{c.cc_delinq:.2f}% ({p(c.cc_delinq_chg, '+.2f')}pp/yr)"
+        if c.cc_delinq is not None
+        else "—"
+    )
+    out.append(f"  CC delinquency : {delinq}   UMich sentiment {p(c.sentiment, '.0f')}")
+    health = f"FRED {c.resolved}/{c.total} live"
+    if c.stale:
+        health += f", stale {','.join(c.stale)}"
+    out.append(
+        f"  read: spend>income + low savings = the consumer-funded leg of AI is stretched; "
+        f"ad-rev growth is the real-time tell.  [{health}]"
+    )
+    return out
+
+
 def _memory_block(m: macro.MemoryPrices | None) -> list[str]:
     if m is None:
         return ["  memory: n/a (add memory_prices.json — see memory_prices.example.json)"]
@@ -452,7 +480,69 @@ def _book_table(rows: list[BookRow]) -> list[str]:
     return out
 
 
-def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> str:
+def _days_since_prev_brief(when: date) -> int:
+    """Days back to the previous brief, so chatter between runs isn't missed. ≥1."""
+    prev: date | None = None
+    for p in BRIEF_DIR.glob("*.md"):
+        try:
+            d = date.fromisoformat(p.stem)
+        except ValueError:
+            continue
+        if d < when and (prev is None or d > prev):
+            prev = d
+    return max(1, (when - prev).days) if prev else 1
+
+
+def _catalyst_block(when: date) -> list[str]:
+    """'## Upcoming catalysts' — curated, commit-safe calendar (neutral event text)."""
+    try:
+        from degen.ingest import catalysts
+
+        if not catalysts.DB_PATH.exists():
+            return []
+        return ["## Upcoming catalysts", "```", *catalysts.brief_lines(as_of=when), "```"]
+    except Exception:
+        return []
+
+
+def _qualitative_inputs(when: date) -> list[str]:
+    """Stage the raw Discord digest to a gitignored file; point the brief at it.
+
+    PRIVACY: the digest is raw third-party chatter (real handles, P&L). It is written
+    ONLY under data/ (gitignored + skipped by the privacy scan). The tracked brief
+    gets a pointer, never the raw text — synthesize anonymized prose by hand here.
+    """
+    out = [
+        "## Qualitative inputs",
+        "_Paste article links / X posts below; pull X text with degen.daily.fetch_xpost._",
+        "",
+    ]
+    try:
+        from degen.ingest import discord_log
+
+        if not discord_log.DB_PATH.exists():
+            return out
+        days = _days_since_prev_brief(when)
+        STAGING_DIR.mkdir(parents=True, exist_ok=True)
+        staged = STAGING_DIR / f"{when.isoformat()}.md"
+        staged.write_text(
+            f"# Discord digest (raw, last {days}d) — {when.isoformat()}\n\n"
+            f"{discord_log.digest(days=days)}\n"
+        )
+        out += [
+            f"_Discord (last {days}d): raw digest staged at `{staged}` (gitignored). "
+            "Synthesize anonymized prose here — never paste raw handles/P&L._",
+            "",
+        ]
+    except Exception:
+        pass  # the brief must never break on the optional Discord layer
+    return out
+
+
+def build_brief(
+    tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT, when: date | None = None
+) -> str:
+    when = when or date.today()
     regime = macro.build()
     fg = macro.fear_greed()
     buf = macro.buffett_indicator()
@@ -463,6 +553,7 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
     cta = macro.cta()
     cc = macro.crypto_credit()
     mem = macro.memory_prices()
+    cons = macro.consumer_health()
     aid = ai_demand()
 
     # delta snapshot: load yesterday's state, compute "what changed", persist today's
@@ -485,6 +576,10 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
         "## Macro regime",
         "```",
         str(regime),
+        "```",
+        "## Consumer (the demand base that funds AI)",
+        "```",
+        *_consumer_block(cons),
         "```",
         "## Sentiment & valuation",
         "```",
@@ -524,9 +619,8 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
         "```",
         *_book_table(other_rows),
         "```",
-        "## Qualitative inputs",
-        "_Paste article links / X posts below; pull X text with degen.daily.fetch_xpost._",
-        "",
+        *_catalyst_block(when),
+        *_qualitative_inputs(when),
     ]
     return "\n".join(lines)
 
@@ -542,8 +636,9 @@ def write_brief(text: str, when: date | None = None) -> Path:
 def main() -> None:
     args = [a.upper() for a in sys.argv[1:]]
     tickers = args or _read_tickers()
-    text = build_brief(tickers)
-    path = write_brief(text)
+    when = date.today()
+    text = build_brief(tickers, when=when)
+    path = write_brief(text, when=when)
     print(text)
     print(f"\n[written to {path}]")
 
