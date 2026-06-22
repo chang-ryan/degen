@@ -357,6 +357,27 @@ def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
     return out
 
 
+def _distribution_block(d: macro.Distribution) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    ls = f"{d.labor_share:.1f}" if d.labor_share is not None else "—"
+    verdict = "→ to CAPITAL (demand base capped)" if d.to_capital else "→ shared / inconclusive"
+    out = [
+        f"  productivity   : {p(d.productivity_yoy)} YoY (output/hr) — the real boom",
+        f"  real pay       : {p(d.real_comp_yoy)} YoY (real comp/hr) — labor's cut",
+        f"  wedge          : {p(d.gap)} (productivity minus pay)  {verdict}",
+        f"  labor share    : {ls} (2017=100), {p(d.labor_share_yoy)} YoY  "
+        "— falling = gains to capital",
+        f"  corp profits   : {p(d.profits_yoy)} YoY — capital's cut",
+        "  read: a boom only ROIs if gains reach the demand base. K-shape slows Clock A (ROI) "
+        "by income-capping consumers; pairs with consumer_health (base) + crypto_credit (Clock B).",
+    ]
+    if d.stale:
+        out.append(f"  [stale: {','.join(d.stale)}]")
+    return out
+
+
 def _memory_block(m: macro.MemoryPrices | None) -> list[str]:
     if m is None:
         return ["  memory: n/a (add memory_prices.json — see memory_prices.example.json)"]
@@ -570,6 +591,7 @@ def build_brief(
     cc = macro.crypto_credit()
     mem = macro.memory_prices()
     cons = macro.consumer_health()
+    dist = macro.distribution()
     froth = macro.retail_froth()
     aid = ai_demand()
 
@@ -597,6 +619,10 @@ def build_brief(
         "## Consumer (the demand base that funds AI)",
         "```",
         *_consumer_block(cons),
+        "```",
+        "## Distribution (who gets the productivity gains)",
+        "```",
+        *_distribution_block(dist),
         "```",
         "## Sentiment & valuation",
         "```",

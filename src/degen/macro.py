@@ -846,6 +846,70 @@ def consumer_health() -> ConsumerHealth:
     )
 
 
+# ---------- distribution (who gets the productivity gains) ----------
+# The missing link between the AI-ROI thesis and the consumer panel. A real
+# productivity boom only ROIs if the gains reach the demand base. If productivity
+# outruns pay and labor share falls, the margin stays with capital (the K-shape) —
+# the capex's own future customers get income-capped, which *slows Clock A* (ROI)
+# even as Clock B (credit) keeps ticking. "Is this boom feeding its customers or
+# eating them?" See ai-infra-cycle-top.md (fallacy-of-composition / two clocks).
+_DIST_SERIES = {
+    "labor_share": ("PRS85006173", 4),  # nonfarm-biz labor share, index 2017=100
+    "productivity": ("OPHNFB", 4),  # output per hour — the real boom
+    "real_comp": ("COMPRNFB", 4),  # real compensation per hour — labor's cut
+    "profits": ("CP", 4),  # corporate profits after tax — capital's cut
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Distribution:
+    labor_share: float | None  # index, 2017=100 (<100 = below baseline)
+    labor_share_yoy: float | None  # falling = gains shifting to capital
+    productivity_yoy: float | None  # output/hr growth — the boom
+    real_comp_yoy: float | None  # real pay growth — labor's participation
+    profits_yoy: float | None  # corp profits growth — capital's participation
+    stale: tuple[str, ...]
+
+    @property
+    def gap(self) -> float | None:
+        """Productivity growth minus real-pay growth; >0 = the wedge escaping labor."""
+        if self.productivity_yoy is None or self.real_comp_yoy is None:
+            return None
+        return self.productivity_yoy - self.real_comp_yoy
+
+    @property
+    def to_capital(self) -> bool:
+        """Gains accruing to capital: productivity outruns pay AND labor share falling."""
+        g = self.gap
+        return bool(g is not None and g > 0 and (self.labor_share_yoy or 0) < 0)
+
+
+def distribution() -> Distribution:
+    """Who captures the productivity boom — labor or capital — from FRED, cached."""
+
+    def _yoy(latest: float | None, prior: float | None) -> float | None:
+        if latest is None or prior is None or prior == 0:
+            return None
+        return latest / prior - 1
+
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    stale: list[str] = []
+    for key, (sid, per) in _DIST_SERIES.items():
+        latest, prior, is_stale = _fred_metric(sid, per)
+        if is_stale:
+            stale.append(sid)
+        vals[key] = (latest, prior)
+
+    return Distribution(
+        labor_share=vals["labor_share"][0],
+        labor_share_yoy=_yoy(*vals["labor_share"]),
+        productivity_yoy=_yoy(*vals["productivity"]),
+        real_comp_yoy=_yoy(*vals["real_comp"]),
+        profits_yoy=_yoy(*vals["profits"]),
+        stale=tuple(stale),
+    )
+
+
 def fred_health() -> list[tuple[str, str, str]]:
     """Ping every FRED series the brief depends on; (series_id, status, detail). The
     pipeline validator — `uv run python -m degen.macro fred`."""

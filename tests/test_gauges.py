@@ -11,7 +11,7 @@ import importlib.util
 import pathlib
 
 from degen.ai_demand import _mtok
-from degen.macro import ConsumerHealth, CryptoCredit
+from degen.macro import ConsumerHealth, CryptoCredit, Distribution
 
 
 def _cc(strc: float | None) -> CryptoCredit:
@@ -46,6 +46,22 @@ def test_consumer_gap() -> None:
     assert round(_consumer(0.021, -0.011).gap, 3) == 0.032  # spending outruns income
     assert _consumer(0.01, 0.03).gap < 0  # income outruns spending
     assert _consumer(None, 0.02).gap is None
+
+
+def _dist(prod: float | None, comp: float | None, ls_yoy: float | None) -> Distribution:
+    return Distribution(
+        labor_share=95.0, labor_share_yoy=ls_yoy, productivity_yoy=prod,
+        real_comp_yoy=comp, profits_yoy=None, stale=(),
+    )
+
+
+def test_distribution_wedge_and_capital() -> None:
+    d = _dist(0.028, 0.006, -0.029)  # the live read: boom escaping labor
+    assert round(d.gap, 3) == 0.022  # productivity outruns pay by 2.2pp
+    assert d.to_capital is True  # wedge>0 AND labor share falling
+    assert _dist(0.01, 0.03, 0.01).gap < 0  # pay outruns productivity
+    assert _dist(0.03, 0.01, 0.02).to_capital is False  # wedge>0 but labor share rising
+    assert _dist(None, 0.01, -0.02).gap is None
 
 
 def test_mtok_pricing_conversion() -> None:

@@ -46,6 +46,13 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         c = macro.consumer_health()
         return f"{c.resolved}/{c.total} live, gap {c.gap:+.1%}" if c.gap is not None else "no gap"
 
+    def distribution() -> str:
+        d = macro.distribution()
+        if d.gap is None:
+            return "no gap"
+        tag = "to-capital" if d.to_capital else "shared"
+        return f"wedge {d.gap:+.1%} [{tag}], labor share {d.labor_share:.1f}"
+
     def fng() -> str:
         fg = macro.fear_greed()
         return f"{fg.score:.0f} ({fg.rating})" if fg else "n/a (blocked)"
@@ -83,6 +90,7 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         ("yfinance — cross-asset", cross),
         ("FRED — regime series", fred_regime),
         ("FRED — consumer series", consumer),
+        ("FRED — distribution series", distribution),
         ("CNN — Fear & Greed", fng),
         ("OpenRouter — ai_demand", ai),
         ("crypto-credit (STRC/MSTR)", crypto),
