@@ -28,16 +28,32 @@ PATTERNS: list[tuple[str, str]] = [
     (r"[+\-\u2212]\$[\d,]+\s*\(", "signed-dollar P&L with a parenthetical (e.g. -$2,146 (...))"),
     (r"net worth", "net-worth reference"),
     (r"\$[\d.]+k\s+(book|cash|port|net|account|premium|sleeve)", "$Nk book/cash/port size"),
-    (r"\b(REDACTED-ACCT|REDACTED-ACCT|REDACTED-ACCT)\b", "broker account number"),
     # NB: bare gain %s (e.g. "1,734%") are NOT scanned — indistinguishable from
     # public trailing-return stats ("+1,100%/252d"). Scrub personal gains by hand.
+    # Exact literals to flag (account numbers, etc.) are NOT hardcoded here — that
+    # would leak them. Put one-per-line in data/privacy_terms.txt (gitignored).
 ]
 
 # Skipped: templates (meant to be empty), vendored code, local data, and THIS
 # file (it necessarily contains the example patterns it scans for).
 SKIP = re.compile(r"\.example\.|^external/|^data/|scripts/privacy_scan\.py$")
 
-_COMPILED = [(re.compile(p, re.IGNORECASE), why) for p, why in PATTERNS]
+_TERMS_FILE = Path("data/privacy_terms.txt")
+
+
+def _extra_patterns() -> list[tuple[str, str]]:
+    """Exact sensitive literals (account #s, etc.) from a gitignored local file."""
+    if not _TERMS_FILE.exists():
+        return []
+    out = []
+    for line in _TERMS_FILE.read_text(encoding="utf-8").splitlines():
+        term = line.strip()
+        if term and not term.startswith("#"):
+            out.append((re.escape(term), "sensitive literal (data/privacy_terms.txt)"))
+    return out
+
+
+_COMPILED = [(re.compile(p, re.IGNORECASE), why) for p, why in PATTERNS + _extra_patterns()]
 
 
 def _tracked_files() -> list[str]:
