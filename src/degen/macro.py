@@ -606,6 +606,53 @@ def cta() -> Cta | None:
         return None
 
 
+# ---------- memory super-cycle price tracker (hand-entered, like cta) ----------
+# The crux gauge for the memory thesis: are DRAM/NAND contract prices tracking the
+# super-bull forecast (Jefferies: +40-50% QoQ 3Q26 >> consensus) or consensus? Prints
+# above = cycle real, top ~2028; at/below = top sooner. Free feeds can't see contract
+# prices, so you hand-enter prints into memory_prices.json. See docs/theses/memory-supercycle.md.
+
+_MEMORY_FILE = Path("memory_prices.json")
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryPrices:
+    source: str
+    fc_3q: tuple[float, float] | None  # forecast 3Q QoQ % range (bull)
+    consensus_3q: tuple[float, float] | None
+    top_marker: str
+    latest: dict | None  # most recent observed print carrying a DRAM/NAND number
+    awaiting: bool  # True until a numeric print lands
+
+
+def memory_prices() -> MemoryPrices | None:
+    """Memory contract-price prints vs the super-cycle forecast (hand-entered)."""
+    try:
+        cfg = json.loads(_MEMORY_FILE.read_text())
+        fc = cfg.get("forecast", {})
+        obs = cfg.get("observed", [])
+
+        latest = None
+        for o in reversed(obs):
+            if o.get("dram_qoq_pct") is not None or o.get("nand_qoq_pct") is not None:
+                latest = o
+                break
+
+        def _rng(v: object) -> tuple[float, float] | None:
+            return (float(v[0]), float(v[1])) if isinstance(v, list) and len(v) == 2 else None
+
+        return MemoryPrices(
+            source=str(fc.get("source", "")),
+            fc_3q=_rng(fc.get("3Q_qoq_pct")),
+            consensus_3q=_rng(fc.get("consensus_3q_qoq_pct")),
+            top_marker=str(fc.get("top_marker", "")),
+            latest=latest,
+            awaiting=latest is None,
+        )
+    except Exception:
+        return None
+
+
 # ---------- crypto / AI-infra credit gauge ----------
 # The MSTR/Strategy capital structure is the leverage node of the BTC-treasury
 # complex and a *dress rehearsal* for AI-infra leverage (leverage against volatile

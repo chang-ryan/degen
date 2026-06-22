@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy to memory_prices.json (gitignored). You drop in contract-price prints as they come; degen.macro.memory_prices() tracks them vs the forecast. Source the forecast from sellside/expert calls; observed from TrendForce/DRAMeXchange/earnings guidance.",
+  "forecast": {
+    "source": "who/when (e.g. sellside expert call, via whom, date)",
+    "3Q_qoq_pct": [0, 0],
+    "4Q_qoq_pct": [0, 0],
+    "consensus_3q_qoq_pct": [0, 0],
+    "top_marker": "what/when marks the cycle top (e.g. supply growth + a competitor catching up)"
+  },
+  "observed": [
+    {"asof": "YYYY-MM-DD", "source": "where (contract print / earnings guide)", "dram_qoq_pct": null, "nand_qoq_pct": null, "note": "..."}
+  ]
+}

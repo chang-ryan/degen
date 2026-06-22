@@ -97,6 +97,7 @@ real positions, P&L, account info, hand-entered proprietary signal levels — is
 | `JOURNAL.md` | `JOURNAL.example.md` | closed-trade log + P&L |
 | `WATCHLIST.md` | `WATCHLIST.example.md` | candidate setups / triggers (book intentions) |
 | `cta_levels.json` | `cta_levels.example.json` | hand-entered CTA thresholds |
+| `memory_prices.json` | `memory_prices.example.json` | hand-entered DRAM/NAND contract-price prints vs forecast |
 | `.env` | (see `degen.edgar` / `degen.etrade`) | API keys / tokens |
 | `data/` | — | broker tokens, IV store, snapshots, filings |
 

@@ -27,6 +27,31 @@ variance: the whole-book tail
 
 **Score: 5/5 — except the catalyst/timing, which is unknowable.** That's the whole point: every structural box is checked; only the trigger is unforecastable. So you manage risk, you don't predict the date.
 
+## The bull steelman (hold this against the boxes — Inspector Lee, 2026-06-22)
+The boxes are the bear case; honesty requires the counterweight, which is *coherent*:
+- **It's not 2000 — earnings-driven, not multiple-driven.** Forward-PE growth *into today*
+  is **−12%** vs **+300%** into the 2000 peak; price growth **+160%** vs **+778%**. The run is
+  earnings, not multiple expansion, and the leaders have real cash flow (vs pets.com). →
+  pushes the magnitude/duration read toward the *milder* valuation-reset side, **not** 2000/2008
+  — *if credit holds*.
+- **Buy the suppliers, not the buyers.** Even if the hyperscalers (the buyers) de-rate, the
+  **memory/optics/photonics suppliers capture the capex** the buyers spend. The picks-and-shovels
+  can keep working *through* a buyer de-rate — which is exactly the Mag7-rolling-while-semis-rip
+  panel we instrument.
+- **Memory's cycle tops ~2028, not now.** Jefferies' memory expert: **+40-50% QoQ pricing in 3Q26,
+  +30-40% in 4Q26** (>> consensus 15-20%/<30%), **2027 +40-45% YoY**, ASP fall not until **2028**
+  (China-NAND catch-up + supply growth). CSP LTAs take 50% (→70%) of capacity, squeezing consumer
+  (explains the Micron Crucial exit). → the memory-specific top has ~2yr of pricing power left;
+  "trim because it's a top" is early *for memory* — the marker is 2028, gauged by contract prices.
+- **Disinflation + seasonality tailwinds.** Oil normalizing (tankers ~2x pre-war) + FOMC's 2.3% PCE
+  proj = the rate vector eases, not tightens; post-midterm seasonality is 16/16 positive since 1962.
+
+**Reconciliation:** these don't negate the leverage/ROI-gap risk — they argue the **timing is later**
+(2028 for memory) and the **magnitude milder** (valuation, not solvency) *so long as credit holds*.
+So the play is unchanged (barbell, watch credit), but the *urgency* of de-risking the memory winners
+specifically is lower than a generic "it's a top" implies. The crux that resolves bull-vs-bear is
+**memory contract pricing** — see the gauge in [[2026-06-22-inspector-lee-memory-supercycle-oil-warsh]].
+
 ## The leverage — confirmed, and where to look
 - **Private credit is the epicenter.** Blackstone, Blue Owl, Apollo, PIMCO, BlackRock originate most datacenter debt, much of it **off-balance-sheet via SPVs** (opaque by design). AI-related private-credit loans went ~0 → **$200B+** in a few years.
 - **GPU-collateralized loans — the fragile part.** CoreWeave took **$12.4B** of GPU-backed loans (Dec 2025); its $8.5B DDTL facility @ 5.9% is rated **investment-grade ONLY because of the *customer's* (Microsoft) credit — CRWV itself is speculative-grade.** The whole edifice rests on hyperscaler contracts holding *and* GPUs not depreciating faster than the loans amortize.

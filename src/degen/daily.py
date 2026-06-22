@@ -313,6 +313,33 @@ def _crypto_credit_block(c: macro.CryptoCredit) -> list[str]:
     return out
 
 
+def _memory_block(m: macro.MemoryPrices | None) -> list[str]:
+    if m is None:
+        return ["  memory: n/a (add memory_prices.json — see memory_prices.example.json)"]
+    out: list[str] = []
+    if m.fc_3q:
+        cons = (
+            f" vs consensus +{m.consensus_3q[0]:.0f}-{m.consensus_3q[1]:.0f}%"
+            if m.consensus_3q
+            else ""
+        )
+        out.append(f"  3Q26 forecast  : +{m.fc_3q[0]:.0f}-{m.fc_3q[1]:.0f}% QoQ{cons}  ({m.source})")
+    if m.top_marker:
+        out.append(f"  cycle-top mark : {m.top_marker}")
+    if m.awaiting:
+        out.append("  latest print   : awaiting (MU guide + 3Q contract prices) — the crux gauge")
+    else:
+        latest = m.latest or {}
+        d = f"DRAM {latest['dram_qoq_pct']:+.0f}%" if latest.get("dram_qoq_pct") is not None else ""
+        n = f"NAND {latest['nand_qoq_pct']:+.0f}%" if latest.get("nand_qoq_pct") is not None else ""
+        out.append(f"  latest print   : {latest.get('asof')} {d} {n} ({latest.get('source')})")
+    out.append(
+        "  read: prints > consensus = super-cycle real (tops ~2028; trim=sizing not "
+        "timing) · < consensus = top sooner."
+    )
+    return out
+
+
 def _ai_demand_block(d: AiDemand | None) -> list[str]:
     if d is None:
         return ["  frontier intel : n/a (OpenRouter fetch failed)"]
@@ -433,6 +460,7 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
     breadth = macro.spx_breadth()
     cta = macro.cta()
     cc = macro.crypto_credit()
+    mem = macro.memory_prices()
     aid = ai_demand()
 
     # delta snapshot: load yesterday's state, compute "what changed", persist today's
@@ -477,6 +505,10 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
         "## AI-infra demand (commoditization)",
         "```",
         *_ai_demand_block(aid),
+        "```",
+        "## Memory super-cycle (price-hike tracker)",
+        "```",
+        *_memory_block(mem),
         "```",
         "## Mag7 — concentration",
         "```",

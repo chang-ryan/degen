@@ -15,6 +15,7 @@
 | [Crypto miners → AI-compute](theses/miners-ai-compute.md) | IREN, RIOT, WULF, GLXY, MARA | open (2026-06-18 — on the book, oversized vs gate) | HPC/AI-hosting deal flow (undated) | crypto-ai-compute |
 | [MSTR/STRC contagion](theses/mstr-strc-contagion.md) | MSTR, STRC (watch) | research (2026-06-18 — the crypto-credit tail under the miners) | reflexive; STRC-discount-to-par gauge | crypto-ai-compute |
 | [AI-infra cycle-top playbook](theses/ai-infra-cycle-top.md) | book-wide | framework (2026-06-18 — risk-management, not a short) | unwind taxonomy + credit instruments | ai-infra |
+| [Memory super-cycle](theses/memory-supercycle.md) | MU, WDC, SNDK, STX | open (2026-06-22 — core long; tops ~2028 not now) | 3Q/4Q26 contract prints; MU 6/24 | ai-infra |
 
 ## Recently archived
 
@@ -28,6 +29,7 @@ Archived theses live in [`theses/_archived/`](theses/_archived/).
 
 > Dated raw material — friend notes, sellside, news, own analyses — that fed a live thesis. Linked from the thesis itself; listed here only if loading on its own adds context this session.
 
+- [2026-06-22 — Inspector Lee: memory super-cycle, oil deflation, Warsh](inputs/2026-06/2026-06-22-inspector-lee-memory-supercycle-oil-warsh.md) — Jefferies memory +40-50% QoQ (tops ~2028); buy suppliers not buyers; crude materially lower; Warsh hike-and-hold not scary; "not 2000."
 - [2026-06-09 — Inspector Lee: Discord notes](inputs/2026-06/2026-06-09-inspector-lee-discord-notes.md) — ABVX idio long (→ thesis), INTC core posture, GEV trim, optics CPO delay, the NAIL lose/lose.
 - [2026-06-05 — Inspector Lee: "strong data, weak stocks"](inputs/2026-06/2026-06-05-inspector-lee-strong-data-weak-stocks.md) — jobs-print selloff as the *healthier* (Scenario B) correction; flush-the-leverage thesis. Informs semis-hedge + the momo-unwind entry hunt.
 - [2026-05-26 — Inspector Lee: cyclical barbell](inputs/2026-06/2026-05-26-inspector-lee-cyclical-barbell.md) — "housing is the most cyclical sector"; the NAIL/XHB barbell call behind the NAIL thesis.
