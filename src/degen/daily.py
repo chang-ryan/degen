@@ -316,6 +316,22 @@ def _crypto_credit_block(c: macro.CryptoCredit) -> list[str]:
     return out
 
 
+def _retail_froth_block(r: macro.RetailFroth) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    md = f"${r.margin_debt:,.0f}B ({p(r.margin_yoy)} YoY)" if r.margin_debt is not None else "n/a"
+    return [
+        f"  margin debt    : {md}  — leverage piling in (>~25% YoY = late-cycle)",
+        f"  high-beta      : SPHB/SPLV {p(r.high_beta_offhi)} off-hi, {p(r.high_beta_5d)}/5d  "
+        "— speculative appetite",
+        f"  casino (2x ETF): avg {p(r.casino_5d)}/5d, avg {p(r.casino_offhi)} off-hi  "
+        "— MSTU/NVDL/TSLL (cratering = spec crowd wrecked)",
+        "  read: the payload size, not the fuse — froth amplifies the move; credit + ROI "
+        "trigger the break. Pair with the F&G put/call sub.",
+    ]
+
+
 def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
     def p(x: float | None, fmt: str = "+.1%") -> str:
         return format(x, fmt) if x is not None else "—"
@@ -554,6 +570,7 @@ def build_brief(
     cc = macro.crypto_credit()
     mem = macro.memory_prices()
     cons = macro.consumer_health()
+    froth = macro.retail_froth()
     aid = ai_demand()
 
     # delta snapshot: load yesterday's state, compute "what changed", persist today's
@@ -610,6 +627,10 @@ def build_brief(
         "## Mag7 — concentration",
         "```",
         *_mag7_block(m7),
+        "```",
+        "## Retail froth (the payload size, not the fuse)",
+        "```",
+        *_retail_froth_block(froth),
         "```",
         "## Book — focus (active theses)",
         "```",

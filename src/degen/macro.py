@@ -867,6 +867,70 @@ def fred_health() -> list[tuple[str, str, str]]:
     return out
 
 
+# ---------- retail froth (the payload size, not the fuse) ----------
+# Retail flooding in is fuel + amplifier, NOT the trigger (credit + ROI are). This
+# instruments *how late / how big*: leverage (margin debt), speculative appetite
+# (high-beta vs low-vol), and the leveraged single-stock ETF "casino" — ripping =
+# froth on, cratering = the speculative crowd getting wrecked. Pairs with the F&G
+# put/call sub (retail options). See ai-infra-cycle-top.md (box #4).
+
+_LEVERED_SINGLE = ("MSTU", "NVDL", "TSLL")  # 2x single-stock ETFs — the casino tell
+
+
+@dataclass(frozen=True, slots=True)
+class RetailFroth:
+    margin_debt: float | None  # $B (FRED Z.1 households margin, quarterly)
+    margin_yoy: float | None  # leverage growth YoY
+    high_beta_offhi: float | None  # SPHB/SPLV off its 63d high
+    high_beta_5d: float | None  # 5d change in the high-beta/low-vol ratio
+    casino_5d: float | None  # avg 5d of the levered single-stock ETF basket
+    casino_offhi: float | None  # avg off-63d-high (deeply negative = casino unwinding)
+    casino_n: int  # how many levered ETFs resolved
+
+
+def _ratio_read(num: str, den: str) -> tuple[float | None, float | None]:
+    """(off-63d-high, 5d change) for a num/den price ratio. None on failure."""
+    try:
+        df = pd.concat([_close(num, "6mo"), _close(den, "6mo")], axis=1).dropna()
+        df.columns = ["a", "b"]
+        r = df["a"] / df["b"]
+        offhi = float(r.iloc[-1] / r.tail(63).max() - 1)
+        d5 = float(r.iloc[-1] / r.iloc[-6] - 1) if len(r) > 5 else None
+        return offhi, d5
+    except Exception:
+        return None, None
+
+
+def retail_froth() -> RetailFroth:
+    """How late / how big the retail flood is — leverage + speculation, price-based + 1 FRED."""
+    md_latest, md_prior, _ = _fred_metric("BOGZ1FL663067003Q", 4)  # quarterly → YoY = 4 obs
+    margin_debt = (md_latest / 1000) if md_latest is not None else None  # $millions → $B
+    margin_yoy = (md_latest / md_prior - 1) if (md_latest and md_prior) else None
+
+    hb_offhi, hb_5d = _ratio_read("SPHB", "SPLV")
+
+    offhis: list[float] = []
+    d5s: list[float] = []
+    for t in _LEVERED_SINGLE:
+        try:
+            s = _close(t, "6mo")
+            offhis.append(float(s.iloc[-1] / s.tail(63).max() - 1))
+            if len(s) > 5:
+                d5s.append(float(s.iloc[-1] / s.iloc[-6] - 1))
+        except Exception:
+            continue
+
+    return RetailFroth(
+        margin_debt=margin_debt,
+        margin_yoy=margin_yoy,
+        high_beta_offhi=hb_offhi,
+        high_beta_5d=hb_5d,
+        casino_5d=(sum(d5s) / len(d5s)) if d5s else None,
+        casino_offhi=(sum(offhis) / len(offhis)) if offhis else None,
+        casino_n=len(offhis),
+    )
+
+
 # ---------- formatting ----------
 
 _STYLE = {
