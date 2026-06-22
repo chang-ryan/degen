@@ -25,6 +25,15 @@ Produce `docs/daily/YYYY-MM-DD.md`: a numbers-only macro + book snapshot with a 
    - If they share an X post: pull text with `degen.daily.fetch_xpost(url)` and add it under `## Qualitative inputs` as a blockquote (author/handle/date) plus a one-line `_Read:_` tying it to today's signals. Same for articles/sellside notes they paste.
    - If they have nothing: leave `## Qualitative inputs` as its placeholder and finish. The debrief is complete on the numbers alone.
 
+### Discord inputs (`degen.discord_log`) — PRIVACY-CRITICAL
+The channel log is a *private local input*, not commit-ready material. `uv run python -m degen.discord_log pull` then `... digest --days 1` gives the raw recent messages (in `data/discord_log.db`, gitignored).
+
+**Never paste the raw digest into a tracked brief.** It contains third-party chatter — *other people's* P&L and positions, the *user's own* P&L brags, and **real Discord handles**. Instead:
+- **Synthesize** the relevant *analysis* into `## Qualitative inputs` — the market read, not the chatter.
+- **Anonymize:** map real handles → pseudonyms (the team lead's handle → **"Inspector Lee"**); never write a real username.
+- **Strip all personal P&L** — anyone's gain/position brags. The thesis is the signal; the brag is not.
+- The pre-commit privacy hook will *catch* slips (real handles live in the gitignored `data/privacy_terms.txt`; plus P&L-prose patterns), but treat it as a backstop — write clean, don't rely on it.
+
 ## The read framework (entry/abort logic)
 
 The book is high-leverage long-premium; the standing question is *when* to enter the momentum drawdown, not whether. See memory `project-momo-unwind`.

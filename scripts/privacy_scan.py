@@ -28,8 +28,12 @@ PATTERNS: list[tuple[str, str]] = [
     (r"[+\-\u2212]\$[\d,]+\s*\(", "signed-dollar P&L with a parenthetical (e.g. -$2,146 (...))"),
     (r"net worth", "net-worth reference"),
     (r"\$[\d.]+k\s+(book|cash|port|net|account|premium|sleeve)", "$Nk book/cash/port size"),
+    (r"\bi'?m up [\d,]+%", "personal P&L brag (e.g. \"I'm up 1700%\") — Discord-style"),
+    (r"\bup [\d,]+% on (my|your|the) ", "personal position P&L (e.g. \"up 389% on my ...\")"),
     # NB: bare gain %s (e.g. "1,734%") are NOT scanned — indistinguishable from
     # public trailing-return stats ("+1,100%/252d"). Scrub personal gains by hand.
+    # Real Discord handles / names go in data/privacy_terms.txt (gitignored) — the
+    # digest pulls third-party chatter (others' P&L, real usernames); never commit it raw.
     # Exact literals to flag (account numbers, etc.) are NOT hardcoded here — that
     # would leak them. Put one-per-line in data/privacy_terms.txt (gitignored).
 ]

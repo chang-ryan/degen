@@ -13,6 +13,12 @@ the IV snapshot.
 `message_id` is the spine: a future calls-ledger and catalyst calendar foreign-key
 back to it, so every structured fact traces to the verbatim line that produced it.
 
+PRIVACY: this DB + the `digest` output are a *private local input* — raw third-party
+chatter with other people's P&L, the user's own P&L, and real Discord handles.
+NEVER commit the digest verbatim into a tracked brief. Synthesize the analysis,
+map handles to pseudonyms ("Inspector Lee"), and strip personal P&L. The DB lives
+under the gitignored `data/`; the pre-commit privacy hook is the backstop.
+
 Setup (one time):
   1. Create a bot application at https://discord.com/developers/applications
      and enable the **Message Content** privileged intent (Bot → Privileged
@@ -175,15 +181,19 @@ def _upsert(conn: sqlite3.Connection, msg: StoredMessage) -> None:
     )
 
 
-def _download_attachment(url: str, message_id: str, filename: str) -> str | None:
+def _download_attachment(url: str, message_id: str, filename: str, idx: int = 0) -> str | None:
     """Save a Discord CDN attachment locally. Returns the path, or None on failure.
 
     Discord CDN links are signed and expire, so we fetch at ingest time rather than
     storing only the URL — the local copy is the durable record of the chart.
     """
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    safe = filename.replace("/", "_")
-    dest = MEDIA_DIR / f"{message_id}-{safe}"
+    # Some Discord/embed filenames are hundreds of chars (base64 proxy URLs) and
+    # overflow the 255-byte filename limit — cap stem and suffix to stay safe.
+    safe = Path(filename.replace("/", "_")).name
+    stem, suffix = Path(safe).stem[:80], Path(safe).suffix[:10]
+    # idx disambiguates multiple same-named attachments on one message (e.g. two image.png)
+    dest = MEDIA_DIR / f"{message_id}-{idx}-{stem}{suffix}"
     if dest.exists():
         return str(dest)
     try:
@@ -199,16 +209,20 @@ def _download_attachment(url: str, message_id: str, filename: str) -> str | None
 # ---------- discord fetch ----------
 
 
-async def _fetch(
+async def _fetch_messages(
     channels: list[int],
     token: str,
     since: datetime | None,
     db_path: Path,
 ) -> int:
-    """Connect, pull messages after the watermark per channel, store, disconnect.
+    """Connect, stream messages after the watermark per channel, commit, disconnect.
 
-    `since` overrides the per-channel watermark (used by backfill). Returns the
-    number of messages written.
+    Attachment *URLs* are recorded here but files are NOT downloaded — that happens
+    in a separate pass (`_download_pending`) once the gateway is closed. Blocking
+    network I/O inside this loop would starve the Discord heartbeat, drop the
+    connection, and re-fire `on_ready` mid-transaction. We commit per channel so a
+    late failure can't roll back earlier channels. `since` overrides the per-channel
+    watermark (backfill). Returns the number of messages written.
     """
     import discord
 
@@ -217,10 +231,14 @@ async def _fetch(
     intents.message_content = True
     client = discord.Client(intents=intents)
     written = 0
+    done = False  # on_ready re-fires on every reconnect; only run the pull once
 
     @client.event
     async def on_ready() -> None:
-        nonlocal written
+        nonlocal written, done
+        if done:
+            return
+        done = True
         try:
             with _connect(db_path) as conn:
                 for cid in channels:
@@ -229,46 +247,47 @@ async def _fetch(
                         channel = await client.fetch_channel(cid)
                     after = since or _last_ts(conn, cid)
                     name = getattr(channel, "name", None)
+                    n_chan = 0
                     async for m in channel.history(  # type: ignore[union-attr]
                         limit=None, after=after, oldest_first=True
                     ):
-                        atts: list[dict[str, str | None]] = []
-                        for a in m.attachments:
-                            local = (
-                                _download_attachment(a.url, str(m.id), a.filename)
-                                if (a.content_type or "").startswith("image/")
-                                else None
-                            )
-                            atts.append(
+                        try:
+                            atts = [
                                 {
                                     "filename": a.filename,
                                     "url": a.url,
-                                    "local_path": local,
+                                    "local_path": None,
                                     "content_type": a.content_type,
                                 }
+                                for a in m.attachments
+                            ]
+                            reply_to = (
+                                str(m.reference.message_id)
+                                if m.reference and m.reference.message_id
+                                else None
                             )
-                        reply_to = (
-                            str(m.reference.message_id)
-                            if m.reference and m.reference.message_id
-                            else None
-                        )
-                        _upsert(
-                            conn,
-                            StoredMessage(
-                                message_id=str(m.id),
-                                channel_id=str(cid),
-                                channel_name=name,
-                                author_id=str(m.author.id),
-                                author_name=str(m.author),
-                                ts=m.created_at.astimezone(UTC).isoformat(),
-                                content=m.content,
-                                reply_to_id=reply_to,
-                                attachments=atts,
-                                tickers=_extract_tickers(m.content, known),
-                            ),
-                        )
-                        written += 1
-                    print(f"  #{name or cid}: pulled to {written} total")
+                            content = m.content or ""
+                            _upsert(
+                                conn,
+                                StoredMessage(
+                                    message_id=str(m.id),
+                                    channel_id=str(cid),
+                                    channel_name=name,
+                                    author_id=str(m.author.id),
+                                    author_name=str(m.author),
+                                    ts=m.created_at.astimezone(UTC).isoformat(),
+                                    content=content,
+                                    reply_to_id=reply_to,
+                                    attachments=atts,
+                                    tickers=_extract_tickers(content, known),
+                                ),
+                            )
+                            n_chan += 1
+                            written += 1
+                        except Exception as e:  # one bad message shouldn't abort the batch
+                            print(f"  skip message {getattr(m, 'id', '?')}: {e}")
+                    conn.commit()  # persist this channel before moving on
+                    print(f"  #{name or cid}: +{n_chan} ({written} total)")
         finally:
             await client.close()
 
@@ -276,11 +295,50 @@ async def _fetch(
     return written
 
 
+def _download_pending(db_path: Path = DB_PATH) -> int:
+    """Download image attachments that don't yet have a local copy.
+
+    Run after the gateway is closed, so blocking HTTP never stalls the heartbeat.
+    Discord CDN URLs are signed and expire, so this should run in the same pull as
+    the fetch that recorded them; a stale URL just fails and stays un-downloaded.
+    """
+    fetched = 0
+    with _connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT message_id, attachments FROM messages WHERE attachments LIKE '%image/%'"
+        ).fetchall()
+        for r in rows:
+            atts = json.loads(r["attachments"])
+            changed = False
+            for i, a in enumerate(atts):
+                if (a.get("content_type") or "").startswith("image/") and not a.get("local_path"):
+                    local = _download_attachment(a["url"], r["message_id"], a["filename"], i)
+                    if local:
+                        a["local_path"] = local
+                        changed = True
+                        fetched += 1
+            if changed:
+                conn.execute(
+                    "UPDATE messages SET attachments = ? WHERE message_id = ?",
+                    (json.dumps(atts), r["message_id"]),
+                )
+        conn.commit()
+    return fetched
+
+
 def pull(since: datetime | None = None, db_path: Path = DB_PATH) -> int:
-    """Fetch new messages from all configured channels. `since` forces a backfill."""
+    """Fetch new messages from all configured channels, then download new charts.
+
+    `since` forces a backfill. Returns the number of messages written.
+    """
     channels = _load_channels()
     token = _load_token()
-    return asyncio.run(_fetch(channels, token, since, db_path))
+    n = asyncio.run(_fetch_messages(channels, token, since, db_path))
+    media = _download_pending(db_path)
+    if media:
+        print(f"  downloaded {media} chart(s)")
+    return n
 
 
 # ---------- queries ----------

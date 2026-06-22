@@ -99,7 +99,15 @@ real positions, P&L, account info, hand-entered proprietary signal levels — is
 | `cta_levels.json` | `cta_levels.example.json` | hand-entered CTA thresholds |
 | `memory_prices.json` | `memory_prices.example.json` | hand-entered DRAM/NAND contract-price prints vs forecast |
 | `.env` | (see `degen.edgar` / `degen.etrade`) | API keys / tokens |
-| `data/` | — | broker tokens, IV store, snapshots, filings |
+| `data/` | — | broker tokens, IV store, snapshots, filings, **Discord log + media**, `privacy_terms.txt` |
+| `discord_channels.json` | — | Discord channel ids for `degen.discord_log` |
+
+> **Discord log is a private input, not commit-ready.** `degen.discord_log` pulls
+> raw channel chatter into `data/discord_log.db` — it contains third-party P&L,
+> the user's own P&L, and real handles. **Never commit the `digest` verbatim**;
+> synthesize the analysis, map handles → pseudonyms ("Inspector Lee"), strip all
+> personal P&L. The pre-commit hook is a backstop (handles live in
+> `data/privacy_terms.txt`), not a license to paste raw.
 
 **What *is* tracked (shareable):** all code (`src/`, `tests/`), the rules
 framework (`CONSTITUTION.md` — account specifics scrubbed), the worldview
