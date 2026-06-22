@@ -39,6 +39,7 @@ web-scraped figures.
 | CNN Fear & Greed | `production.dataviz.cnn.io` | `macro.py` | F&G composite + 7 subs (browser headers required; contrarian input) |
 | Wikipedia | S&P 500 constituents page | `macro.py` (`spx_breadth`) | The 503-name list for index-wide %>50/200dma breadth (browser UA required; symbols normalized BRK.B→BRK-B) |
 | X/Twitter syndication | `cdn.syndication.twimg.com` | `daily.py` (`fetch_xpost`) | Pull public post text into daily-brief qualitative inputs |
+| Robinhood / E*TRADE | broker APIs (MCP / OAuth) | live position reconciliation | Real book → POSITIONS.md (`degen.etrade`, Robinhood MCP) |
 | Hand-entered | `cta_levels.json` | `macro.py` (`cta`) | CTA systematic-selling thresholds from team/sellside notes — can't be derived from free feeds; carries `asof`, goes stale |
 
 Deliberately **not** in the stack: real-time feeds, paid options data, broker
@@ -82,6 +83,47 @@ degen/
 ```
 
 ---
+
+## Local-only files (personal — create locally, never committed)
+
+The repo is a shareable skeleton. Anything that reflects a **live book** —
+real positions, P&L, account info, hand-entered proprietary signal levels — is
+**gitignored** and created locally from a tracked `*.example` template:
+
+| Local file (gitignored) | Copy from | Holds |
+|---|---|---|
+| `POSITIONS.md` | `POSITIONS.example.md` | live positions, P&L, account snapshot |
+| `JOURNAL.md` | `JOURNAL.example.md` | closed-trade log + P&L |
+| `WATCHLIST.md` | `WATCHLIST.example.md` | candidate setups / triggers (book intentions) |
+| `cta_levels.json` | `cta_levels.example.json` | hand-entered CTA thresholds |
+| `.env` | (see `degen.edgar` / `degen.etrade`) | API keys / tokens |
+| `data/` | — | broker tokens, IV store, snapshots, filings |
+
+**What *is* tracked (shareable):** all code (`src/`, `tests/`), the rules
+framework (`CONSTITUTION.md` — account specifics scrubbed), the worldview
+(`MACRO.md`), theses (`docs/theses/`), inputs (`docs/inputs/`), daily briefs
+(`docs/daily/`), and the watchlist *basket* (`tickers.txt`).
+
+First-time setup: `cp POSITIONS.example.md POSITIONS.md` (and the same for the
+others), then fill them in. They'll stay out of git.
+
+**Guardrail:** `scripts/privacy_scan.py` greps tracked + about-to-be-committed
+files for live-book leakage (dollar P&L, net-worth/account references, `$Nk`
+book sizes) and exits non-zero on a hit. Wire it as a pre-commit hook so it
+can't regress:
+
+```bash
+ln -sf ../../scripts/hooks/pre-commit .git/hooks/pre-commit
+```
+
+Run it any time with `uv run python scripts/privacy_scan.py`. It's a heuristic
+tripwire, not a proof — market data (prices, IV%, breadth%) is intentionally not
+flagged, and bare gain %s are scrubbed by hand (they look like public return
+stats). Bypass a known-good commit with `git commit --no-verify`.
+
+> Note: daily briefs include a per-ticker **book table** (the names you watch).
+> If you don't want holdings visible, scrub that section before committing — the
+> tickers, not sizes/P&L, are what's exposed there.
 
 ## Setup (one time)
 
@@ -162,14 +204,14 @@ from degen.size import defined_risk_contracts, gap_sized_shares
 
 # Defined-risk: long options / debit spreads
 defined_risk_contracts(
-    port_value=100_000,
+    port_value=73_772,
     premium_per_contract=350,   # debit × 100
     risk_pct=0.01,              # 1% until edge proven
 )
 
 # Naked / margin / LETF: size to 2–3σ overnight gap ≤ 5%
 gap_sized_shares(
-    port_value=100_000,
+    port_value=73_772,
     underlying_price=180,
     annual_vol=0.45,
     sigmas=2.5,
@@ -189,7 +231,7 @@ positions = [
     Position("SMH",   max_loss=1_200, group="ai-semis-hedge"),
     Position("USO",   max_loss=  500, group="oil"),
 ]
-print(heat_report(positions, port_value=100_000, cap_pct=0.08))
+print(heat_report(positions, port_value=73_772, cap_pct=0.08))
 ```
 
 ### `degen.iv_store`
@@ -257,7 +299,10 @@ Beyond the regime verdict, `macro.py` also provides the daily-brief panels:
 (per-name concentration color — explicitly *not* a breadth measure),
 `spx_breadth()` (% of all 503 S&P names above 50/200dma — the load-bearing
 breadth read; ~60s batch download), `cta()` (distance to hand-entered CTA
-thresholds in `cta_levels.json`), plus `fear_greed()` (contrarian),
+thresholds in `cta_levels.json`), `crypto_credit()` (the STRC/Strategy-pref
+stack + MSTR-vs-BTC — a crypto-credit funding-stress gauge that leads the
+miners and is the dress rehearsal for AI-infra leverage; see
+`theses/mstr-strc-contagion.md`), plus `fear_greed()` (contrarian),
 `buffett_indicator()`, and `cross_asset()`. Measurement principles are in the
 module docstring.
 

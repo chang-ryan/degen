@@ -106,7 +106,7 @@ def term_structure(
     for exp, dte in sorted(chosen.items(), key=lambda kv: kv[1]):
         try:
             iv = atm_iv(ticker, exp)
-        except Exception:  # noqa: BLE001 — yfinance can return empty chains
+        except Exception:
             continue
         rows.append({"expiry": exp, "dte": dte, "atm_iv": iv})
     return pd.DataFrame(rows)
@@ -147,7 +147,7 @@ def liquid_chain(
     Defaults tuned for *monthly/LEAP* chains: OI is the real liquidity signal,
     daily volume is near-zero for back-month strikes by design, and absolute
     spread is meaningless on a $30 LEAP. We accept the wider of
-    `abs_spread_floor` or `max_spread_pct × mid`.
+    `abs_spread_floor` or `max_spread_pct x mid`.
     """
     ch = chain(ticker, expiry)
 
@@ -172,7 +172,7 @@ def next_earnings(ticker: str) -> date | None:
     """
     try:
         df = yf.Ticker(ticker).get_earnings_dates(limit=8)
-    except Exception:  # noqa: BLE001 — lxml missing, network, etc.
+    except Exception:
         return None
     if df is None or df.empty:
         return None
@@ -186,7 +186,7 @@ def last_earnings(ticker: str, limit: int = 8) -> pd.DataFrame | None:
     None on failure."""
     try:
         df = yf.Ticker(ticker).get_earnings_dates(limit=limit)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
     if df is None or df.empty:
         return None

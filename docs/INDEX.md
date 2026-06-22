@@ -11,7 +11,10 @@
 | Semis/optics/mem hedge — _no thesis file; see [POSITIONS.md](../POSITIONS.md)_ | SMH, SOXX | window passed (never placed — see POSITIONS 6/10 note) | none (insurance) | ai-semis-hedge |
 | Oil deflation — _no thesis file; see [POSITIONS.md](../POSITIONS.md)_ | USO | open | Hormuz reopening | oil |
 | [NAIL — housing cyclical barbell](theses/nail-housing-cyclical.md) | NAIL (express via ITB/XHB) | proposed (2026-06-09 — chase flag, await pullback) | none dated — rotation + rate-path | cyclical-rotation |
-| [ABVX post-scare Ph3 idio](theses/abvx-ph3-idio.md) | ABVX | proposed (2026-06-09 — chase flag, binary event) | June Ph3 update (lands Jun-18–Jul-17 per IV) | idio-biotech |
+| [ABVX post-scare Ph3 idio](theses/abvx-ph3-idio.md) | ABVX | stand-down (2026-06-18 — catalyst resolved, malignancy overhang) | NDA filing Q4 2026 | idio-biotech |
+| [Crypto miners → AI-compute](theses/miners-ai-compute.md) | IREN, RIOT, WULF, GLXY, MARA | open (2026-06-18 — on the book, oversized vs gate) | HPC/AI-hosting deal flow (undated) | crypto-ai-compute |
+| [MSTR/STRC contagion](theses/mstr-strc-contagion.md) | MSTR, STRC (watch) | research (2026-06-18 — the crypto-credit tail under the miners) | reflexive; STRC-discount-to-par gauge | crypto-ai-compute |
+| [AI-infra cycle-top playbook](theses/ai-infra-cycle-top.md) | book-wide | framework (2026-06-18 — risk-management, not a short) | unwind taxonomy + credit instruments | ai-infra |
 
 ## Recently archived
 

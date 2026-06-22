@@ -69,7 +69,7 @@ def build(ticker: str, target_dte: int = 120) -> Dashboard:
 
     try:
         sk = skew_25d(ticker, target)
-    except Exception:  # noqa: BLE001
+    except Exception:
         sk = None
 
     ts = term_structure(ticker)
@@ -114,8 +114,8 @@ def format_dashboard(d: Dashboard) -> str:
             f"  IV rank (252d) : {rank_pct}    [{iv_verdict}]",
             f"  25Δ skew       : {_fmt(d.skew_25d_target, '.3f')}    [{skew_verdict}]",
             f"  Term slope     : {_fmt(d.term_slope, '+.3f')}   "
-            "(longest − shortest; +=contango, −=event/stress)",
-            f"  Liquid strikes : {d.liquid_strikes_target}  (target expiry, after OI/vol/spread filter)",
+            "(longest - shortest; +=contango, -=event/stress)",
+            f"  Liquid strikes : {d.liquid_strikes_target}  (target expiry, after OI/vol filter)",
             f"  Next earnings  : {_fmt(d.days_to_earnings, 'd')} days",
         ]
     )

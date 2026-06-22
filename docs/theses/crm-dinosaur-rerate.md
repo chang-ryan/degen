@@ -57,7 +57,7 @@ The OKTA-style violent intraday re-rate is past — CRM already had its $176→$
   - IV/HV < 0.8 and skew flat → favor LEAP (vol cheap, simple long).
   - IV/HV > 1.0 or skew rich → favor spread (sell the upper leg, don't pay up).
   - Current read (2026-06-03): IV/HV 0.81, skew flat → **borderline; spread for capital efficiency at this account size.**
-- **Sizing constraint surfaced by the toolkit:** a 0.65Δ Jan-27 LEAP costs $3,272/contract — even one contract breaches the 1% gate at $100k port. Either (a) take the $200/$260 Jan-27 spread at $1,560 debit (fits 1 contract at the 2% cap, breakeven +12.3%), or (b) tighten to $200/$240 spread (cheaper debit, lower max payoff), or (c) wait for an entry where IV is meaningfully lower.
+- **Sizing constraint surfaced by the toolkit:** a 0.65Δ Jan-27 LEAP costs $3,272/contract — even one contract breaches the 1% defined-risk gate at this book size (size off the live port in POSITIONS.md; the older $100k figure here was stale). Either (a) take the $200/$260 Jan-27 spread at $1,560 debit (fits 1 contract at the 2% cap, breakeven +12.3%), or (b) tighten to $200/$240 spread (cheaper debit, lower max payoff), or (c) wait for an entry where IV is meaningfully lower.
 
 ## Supporting inputs
 - Primary sources pulled via `degen.edgar` (2026-06-10): `data/filings/CRM/latest_10Q.txt` (FQ1 ended 2026-04-30, filed 5/28) + `latest_earnings_8K.txt`. Note: the 8-K is the stub only — Exhibit 99.1 (the press release with the Agentforce ARR figure) is not fetched; the ARR gate needs the press release or call transcript.

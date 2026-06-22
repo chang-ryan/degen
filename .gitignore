@@ -17,3 +17,14 @@ data/
 *.csv
 *.parquet
 *.sqlite
+
+# Secrets / local config
+.env
+discord_channels.json
+
+# Live book — personal positions / P&L / hand-entered signal levels.
+# Create these locally from the tracked *.example templates; never commit.
+POSITIONS.md
+JOURNAL.md
+WATCHLIST.md
+cta_levels.json

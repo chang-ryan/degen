@@ -1,0 +1,10 @@
+#!/bin/sh
+# degen pre-commit guardrail: block commits that leak live-book personal info.
+# Install:  ln -sf ../../scripts/hooks/pre-commit .git/hooks/pre-commit
+# (or `cp`). Bypass once with `git commit --no-verify` if you're sure.
+uv run python scripts/privacy_scan.py || {
+  echo "
+commit blocked by privacy scan. Scrub the personal numbers (keep the analysis),
+move the content to a gitignored file, or re-run with --no-verify if intentional." >&2
+  exit 1
+}

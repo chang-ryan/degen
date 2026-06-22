@@ -57,6 +57,17 @@ Each is a reusable prompt or script that enforces the constitution.
 2. **`weekly`** — refresh MACRO.md + POSITIONS.md, recompute heat, flag breaches, list catalysts in the next 2 weeks. (Done by hand 2026-06-10; codify it.)
 3. **`journal`** — on close, append a JOURNAL.md entry from the template and update the quarterly rollup.
 
+### Recently built (2026-06)
+- **`degen.edgar`** — SEC filings + exhibits (closed the CRM Agentforce gate from the press release).
+- **`degen.etrade`** — read-only OAuth client; reconciled the long-term book (revealed heavy AI-correlation across the combined book).
+- **`macro.crypto_credit()`** — STRC/Strategy-pref + MSTR-vs-BTC gauge (the crypto-credit dress rehearsal for AI-infra leverage), rendered in the daily brief + digest.
+- **Delta snapshots** (`data/snapshots/`) — each `degen.daily` run persists state; the next opens with a "What changed" lede. (Gleaned from the atlas-brief engine.)
+
+### Tooling roadmap (from the atlas-brief recon + data-subscription review)
+- **Build (free):** the credit panel could extend to BDC discounts / neocloud (CRWV) credit; the z-score regime composite (replaces the binary label that misfired 6/09); importance/tier ranking for the brief.
+- **Buy (ranked):** Unusual Whales ($50/mo web — flow/dealer-gamma, the crowding instrument); Polygon/"Massive" (historical IV → instant IV-rank); SemiAnalysis (AI-infra research, the central-bet edge). See the chat thread for the full build-vs-buy rationale.
+- **atlas-brief patterns still un-ported:** Pydantic Brief schema (JSON export for Discord), deterministic-context injection into thesis-validation search prompts, analyst earnings-revisions breadth.
+
 ---
 
 ## 4. Build roadmap

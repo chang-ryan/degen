@@ -606,6 +606,97 @@ def cta() -> Cta | None:
         return None
 
 
+# ---------- crypto / AI-infra credit gauge ----------
+# The MSTR/Strategy capital structure is the leverage node of the BTC-treasury
+# complex and a *dress rehearsal* for AI-infra leverage (leverage against volatile
+# collateral — BTC there, GPUs/contracts in the neoclouds). STRC is engineered to
+# trade at $100 par via monthly dividend resets; its discount to par is a live
+# funding-stress gauge that LEADS the miners and rhymes with the private-credit
+# unwind risk under the whole AI buildout. Credit cracking here = the 2008-side of
+# the unwind taxonomy. See docs/theses/mstr-strc-contagion.md + ai-infra-cycle-top.md.
+
+_STRATEGY_PREFS = ("STRC", "STRK", "STRF", "STRD")  # the Strategy preferred stack
+
+
+@dataclass(frozen=True, slots=True)
+class CryptoCredit:
+    strc: float | None  # STRC price (par = 100)
+    strc_discount: float | None  # strc/100 - 1; negative = below par = funding stress
+    pref_below_par: int  # how many of the 4 prefs trade below 100
+    pref_total: int  # how many resolved
+    pref_5d: float | None  # avg 5d change across the stack (deeply negative = stress)
+    mstr_btc_21d: float | None  # MSTR 21d return minus BTC 21d; <0 = mNAV compressing
+    btc: float | None
+    mstr: float | None
+
+    @property
+    def stress(self) -> bool:
+        """The de-risk trigger: STRC peg failing (<~$90)."""
+        return self.strc is not None and self.strc < 90
+
+    @property
+    def band(self) -> str:
+        if self.strc is None:
+            return "n/a"
+        if self.strc < 80:
+            return "crisis"
+        if self.strc < 90:
+            return "peg failing"
+        if self.strc < 95:
+            return "stress building"
+        return "normal"
+
+
+def crypto_credit() -> CryptoCredit:
+    """Strategy (MSTR) capital-structure stress — the crypto-credit leading gauge.
+
+    STRC's discount to its $100 par, the whole-pref-stack breadth (cracking
+    together = credit not idiosyncratic), and MSTR-vs-BTC (the mNAV-compression
+    proxy — MSTR falling faster than BTC = the equity-funding window closing).
+    """
+
+    def series(t: str) -> pd.Series | None:
+        try:
+            s = _close(t, "6mo")
+            return s if not s.empty else None
+        except Exception:
+            return None
+
+    prefs = {t: series(t) for t in _STRATEGY_PREFS}
+    strc_s = prefs["STRC"]
+    strc = float(strc_s.iloc[-1]) if strc_s is not None else None
+
+    below = total = 0
+    d5s: list[float] = []
+    for s in prefs.values():
+        if s is None:
+            continue
+        total += 1
+        below += int(float(s.iloc[-1]) < 100)
+        if len(s) > 5:
+            d5s.append(float(s.iloc[-1] / s.iloc[-6] - 1))
+    pref_5d = sum(d5s) / len(d5s) if d5s else None
+
+    mstr_s, btc_s = series("MSTR"), series("BTC-USD")
+
+    def r21(s: pd.Series | None) -> float | None:
+        return float(s.iloc[-1] / s.iloc[-22] - 1) if s is not None and len(s) > 22 else None
+
+    m21, b21 = r21(mstr_s), r21(btc_s)
+    mstr_btc = (m21 - b21) if (m21 is not None and b21 is not None) else None
+
+    return CryptoCredit(
+        strc=strc,
+        strc_discount=(strc / 100 - 1) if strc is not None else None,
+        pref_below_par=below,
+        pref_total=total,
+        pref_5d=pref_5d,
+        mstr_btc_21d=mstr_btc,
+        btc=float(btc_s.iloc[-1]) if btc_s is not None else None,
+        mstr=float(mstr_s.iloc[-1]) if mstr_s is not None else None,
+    )
+
+
 # ---------- formatting ----------
 
 _STYLE = {

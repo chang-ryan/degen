@@ -65,7 +65,7 @@ def snapshot(
             try:
                 exp = _pick_near_dte_expiry(t, target_dte)
                 iv = atm_iv(t, exp)
-            except Exception as e:  # noqa: BLE001 — log and skip, don't abort the batch
+            except Exception as e:
                 print(f"  {t}: skip ({e})")
                 results[t] = None
                 continue

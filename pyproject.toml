@@ -9,6 +9,10 @@ dependencies = [
     "numpy>=2.0",
     "scipy>=1.13",
     "lxml>=6.1.1",
+    "discord-py>=2.4",
+    "requests>=2.34.2",
+    "requests-oauthlib>=2.0.0",
+    "python-dotenv>=1.2.2",
 ]
 
 [dependency-groups]
@@ -28,6 +32,7 @@ packages = ["src/degen"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["external"]  # vendored reference code (friends' agents) — not ours to lint
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "N", "ANN"]

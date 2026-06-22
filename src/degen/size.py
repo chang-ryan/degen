@@ -3,8 +3,8 @@
 Two regimes:
   - Defined-risk (long options, debit spreads): max loss = premium paid.
     Size so premium is `risk_pct` of port (1% default, 2% cap until edge proven).
-  - Naked / margin / leveraged-ETF: loss not capped. Size so a `sigmas`-σ adverse
-    overnight gap stays ≤ `max_gap_pct` of port.
+  - Naked / margin / leveraged-ETF: loss not capped. Size so a `sigmas`-sigma adverse
+    overnight gap stays <= `max_gap_pct` of port.
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ def defined_risk_contracts(
     premium_per_contract: float,
     risk_pct: float = 0.01,
 ) -> int:
-    """Contracts to buy such that total premium ≤ risk_pct of port.
+    """Contracts to buy such that total premium <= risk_pct of port.
 
-    `premium_per_contract` is the per-share debit × 100 (one contract = 100 shares).
+    `premium_per_contract` is the per-share debit x 100 (one contract = 100 shares).
     Floors to whole contracts; returns 0 if even one contract breaches the budget.
     """
     if premium_per_contract <= 0:
@@ -36,7 +36,7 @@ def gap_sized_shares(
     max_gap_pct: float = 0.05,
     horizon_days: float = 1.0,
 ) -> int:
-    """Shares of an uncapped-risk position such that an adverse `sigmas`-σ move
+    """Shares of an uncapped-risk position such that an adverse `sigmas`-sigma move
     over `horizon_days` stays inside `max_gap_pct` of port.
 
     annual_vol: e.g. 0.40 for 40% annualized.

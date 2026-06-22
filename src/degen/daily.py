@@ -174,6 +174,7 @@ def _signal_digest(
     momo: macro.Momentum,
     breadth: macro.SpxBreadth | None,
     cta: macro.Cta | None,
+    cc: macro.CryptoCredit | None = None,
 ) -> list[str]:
     """The day's key signals as one machine-read line — the scaffold the memo draws from.
 
@@ -207,6 +208,8 @@ def _signal_digest(
             bits.append(f"CTA {'/'.join(breached)} breached")
         elif nearest is not None:
             bits.append(f"CTA {nearest.dist:+.1%} to {nearest.name}")
+    if cc is not None and cc.strc is not None and cc.strc < 95:
+        bits.append(f"STRC {cc.strc:.0f} ({cc.band})")
 
     return [
         "## Synopsis",
@@ -281,6 +284,110 @@ def _mag7_block(m: macro.Mag7) -> list[str]:
     return out
 
 
+def _crypto_credit_block(c: macro.CryptoCredit) -> list[str]:
+    out: list[str] = []
+    if c.strc is not None and c.strc_discount is not None:
+        out.append(
+            f"  STRC (par 100) : {c.strc:>8,.2f}  ({c.strc_discount:+.1%} vs par)  [{c.band}]"
+        )
+    else:
+        out.append("  STRC (par 100) : n/a")
+    line = f"  Strategy prefs : {c.pref_below_par}/{c.pref_total} below par"
+    if c.pref_5d is not None:
+        line += f", {c.pref_5d:+.1%} avg 5d"
+    out.append(line + "  (whole stack cracking together = credit, not idiosyncratic)")
+    if c.mstr_btc_21d is not None:
+        tag = (
+            "MSTR underperforming → mNAV compressing, funding window closing"
+            if c.mstr_btc_21d < 0
+            else "premium holding"
+        )
+        out.append(f"  MSTR vs BTC    : {c.mstr_btc_21d:+.1%} (21d)  — {tag}")
+    if c.btc is not None and c.mstr is not None:
+        out.append(f"  BTC {c.btc:>9,.0f}   MSTR {c.mstr:,.2f}   (the leverage node)")
+    out.append(
+        "  read: STRC <90 falling = de-risk miners · <80 = cut hard  "
+        "(crypto-credit is the dress rehearsal for AI-infra credit)"
+    )
+    return out
+
+
+# ---------- delta snapshots (atlas-brief idea: a "what changed" lede) ----------
+
+SNAP_DIR = Path("data/snapshots")
+
+
+def _snapshot_state(
+    when: date,
+    regime: macro.Regime,
+    momo: macro.Momentum,
+    breadth: macro.SpxBreadth | None,
+    fg: macro.FearGreed | None,
+    m7: macro.Mag7,
+    cc: macro.CryptoCredit,
+) -> dict:
+    legs = [lg for lg in momo.legs if lg.dd63 is not None]
+    basing = sum(1 for lg in legs if lg.d5 is not None and lg.d5 >= 0)
+    avg_dd = sum(lg.dd63 for lg in legs) / len(legs) if legs else None
+    return {
+        "date": when.isoformat(),
+        "regime": regime.verdict,
+        "stress": regime.stress_count,
+        "available": regime.available_count,
+        "vix": momo.vix,
+        "spx_pct50": breadth.pct_50 if breadth else None,
+        "fng": fg.score if fg else None,
+        "mag7_breadth": m7.above_50,
+        "legs_basing": basing,
+        "legs_avg_offhi": avg_dd,
+        "strc": cc.strc,
+    }
+
+
+def _write_snapshot(state: dict, when: date) -> None:
+    SNAP_DIR.mkdir(parents=True, exist_ok=True)
+    (SNAP_DIR / f"{when.isoformat()}.json").write_text(json.dumps(state, indent=2))
+
+
+def _load_prior_snapshot(before: date) -> dict | None:
+    if not SNAP_DIR.exists():
+        return None
+    files = sorted(p for p in SNAP_DIR.glob("*.json") if p.stem < before.isoformat())
+    if not files:
+        return None
+    try:
+        return json.loads(files[-1].read_text())
+    except Exception:
+        return None
+
+
+def _deltas_block(today: dict, prior: dict | None) -> list[str]:
+    """The 'what changed since the last brief' lede — keeps the brief newsworthy."""
+    if not prior:
+        return ['_First snapshot — "what changed" deltas begin on the next run._', ""]
+    items: list[str] = []
+    if prior.get("regime") and today.get("regime") != prior.get("regime"):
+        items.append(f"**regime {prior['regime']} → {today['regime']}**")
+
+    def _d(key: str, label: str, fmt: str, thresh: float, *, pct: bool = False) -> None:
+        a, b = today.get(key), prior.get(key)
+        if a is None or b is None or abs(a - b) < thresh:
+            return
+        items.append(f"{label} {b:.0%} → {a:.0%}" if pct else f"{label} {b:{fmt}} → {a:{fmt}}")
+
+    _d("vix", "VIX", ".0f", 1)
+    _d("spx_pct50", "SPX breadth", "", 0.02, pct=True)
+    _d("fng", "F&G", ".0f", 3)
+    _d("strc", "STRC", ".1f", 1)
+    _d("mag7_breadth", "Mag7", ".0f", 1)
+    a, b = today.get("legs_basing"), prior.get("legs_basing")
+    if a is not None and b is not None and a != b:
+        items.append(f"legs basing {b} → {a}")
+    if not items:
+        items.append("no material change in the tracked signals")
+    return [f"_vs prior brief ({prior.get('date', '?')}):_  " + "  ·  ".join(items), ""]
+
+
 def _book_table(rows: list[BookRow]) -> list[str]:
     head = (
         f"  {'':6} {'spot':>9} {'1d':>7} {'5d':>7} {'HV30':>7} "
@@ -305,6 +412,13 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
     m7 = macro.mag7()
     breadth = macro.spx_breadth()
     cta = macro.cta()
+    cc = macro.crypto_credit()
+
+    # delta snapshot: load yesterday's state, compute "what changed", persist today's
+    today = date.today()
+    today_state = _snapshot_state(today, regime, momo, breadth, fg, m7, cc)
+    deltas = _deltas_block(today_state, _load_prior_snapshot(today))
+    _write_snapshot(today_state, today)
 
     focus_set = {t.upper() for t in focus}
     focus_rows = [book_row(t, full=True) for t in tickers if t.upper() in focus_set]
@@ -314,7 +428,9 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
     lines = [
         f"# Daily brief — {regime.asof}",
         "",
-        *_signal_digest(regime, momo, breadth, cta),
+        *_signal_digest(regime, momo, breadth, cta, cc),
+        "## What changed",
+        *deltas,
         "## Macro regime",
         "```",
         str(regime),
@@ -332,6 +448,10 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
         "## Breadth & systematic flows",
         "```",
         *_breadth_cta_block(breadth, cta),
+        "```",
+        "## Crypto / AI-infra credit",
+        "```",
+        *_crypto_credit_block(cc),
         "```",
         "## Mag7 — concentration",
         "```",

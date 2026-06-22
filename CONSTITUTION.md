@@ -6,14 +6,14 @@
 
 ## Account context
 - **Sleeve:** speculative / high-variance "for fun" options book.
-- **Size:** ~$100k (started ~$20k ~1 year ago; the 5x is a single lucky sample, **not** a measured edge — see Sizing).
-- **Broker:** Robinhood. No clean official API → positions/history come in via CSV export (preferred) or `robin_stocks` (unofficial, credential + ToS risk).
+- **Size:** kept in the local (gitignored) `POSITIONS.md`, not here — any past multiple is a lucky sample, **not** a measured edge. Sizing rules below are expressed as **% of port**, so they're account-size-agnostic and this file stays shareable.
+- **Broker:** live read access via the broker MCP / `degen.etrade`; the live book is reconciled into the local `POSITIONS.md`.
 - **Instruments:** long options, spreads, naked options, margin, leveraged ETFs.
 - **Liquidity:** no near-term need; this capital is risk-on by design and segregated from the long-term equities account.
 
 ## Core philosophy
 1. **Process > outcome.** A good process can lose; a bad process can win. We grade the process, logged in JOURNAL.md.
-2. **Capital preservation first.** The game now is protecting the ~$80k of house money, not chasing the next 5x. The same leverage that built this can round-trip it.
+2. **Capital preservation first.** The game now is protecting house money, not chasing the next multiple. The same leverage that built the book can round-trip it.
 3. **Earn the right to size up.** Do not increase size off a lucky streak. Size up only after JOURNAL.md shows a real, measured edge over enough trades.
 
 ## Risk limits (the framework)

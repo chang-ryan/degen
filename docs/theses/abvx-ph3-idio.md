@@ -4,7 +4,7 @@ ticker: ABVX
 status: proposed
 opened: 2026-06-09
 spot_at_open: 102.72
-catalyst: June 2026 Ph3 obefazimod update (vol surface implies event lands between Jun-18 and Jul-17 expiries)
+catalyst: RESOLVED — Ph3 ABTECT maintenance read out 2026-06-01/02 (efficacy win + malignancy scare). Next catalyst = NDA filing Q4 2026. See 2026-06-18 update.
 correlation_group: idio-biotech
 variance: extreme
 ---
@@ -63,3 +63,8 @@ Lee's "non-AI idio long into July": the malignancy scare knocked a third off a n
 
 ## Updates
 - **2026-06-09:** thesis opened at $102.72, after the -41% malignancy-scare drawdown and a +42%/5d bounce. Proposed, not placed — chase flag at this level; structure preference is July call spreads (or short put spreads below $75) over naked premium at ~120% IV. Watching for the Ph3 update date to firm up.
+- **2026-06-18 — MAJOR CORRECTION + thesis re-frame (primary sources pulled).** The 6/09 file got the event *timing wrong*: it framed the Ph3 readout as a *future* June catalyst the vol surface would date. In fact **the pivotal Ph3 ABTECT MAINTENANCE data already dropped 2026-06-01/02** — and the -41% crash ($133 → $72.50) the thesis treated as a "scare to fade" *was the event itself*. So the thesis was written mid-bounce, after the binary, not before it.
+  - **What the data actually showed (now confirmed):** efficacy was a **blowout** — Wk44 remission **50.8% (25mg) / 51.3% (50mg) vs 10.4% placebo, Δ~40%, p<0.0001** (best-in-class oral UC). **But** a **malignancy signal at the efficacious 50mg dose** — NMSC skin cancers + single cases of prostate, breast, colonic dysplasia. That safety overhang, not efficacy, is the whole story.
+  - **The pivotal program is COMPLETE** (induction Jul-2025 + maintenance Jun-2026). **No pending readout.** Next catalyst = **NDA filing Q4 2026** (~6 months out); Crohn's Ph2b mid-2027. Cash runway through 2027.
+  - **Reaction tells the tape:** formal write-up + Q1 financials 6/17 → stock **flat ~$99**, sitting in a $96-103 range for 2+ weeks, -25% off the $132 high. Positive efficacy did **not** re-rate it toward Lee's $145 node. **Jefferies cut to Hold** ("overhang not easily dismissed"); Citizens stayed constructive. It's now an **analyst/FDA safety debate, not a binary-event vol trade.**
+  - **Verdict: the original trade is dead — do not open it.** The binary resolved into a non-move; the catalyst this week's question hinged on is behind us. What remains is a **6-month fundamental bet on "the malignancy signal is noise and the NDA path re-rates it"** — longer horizon, Q4 catalyst, and squarely in the "we can't read oncology safety tables vs the FDA" zone we flagged as outside our edge. **Status → effectively stand-down/watch.** Re-engage only as a *new, longer-dated* thesis on a pullback toward the $72-80 base, sized tiny/defined-risk, expressed past the Q4 NDA — not as July premium that bleeds theta into an eventless month.

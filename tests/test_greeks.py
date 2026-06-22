@@ -18,7 +18,7 @@ def test_atm_call_put_parity():
 
 
 def test_hull_example_13_6():
-    # Hull 9e Ex 13.6: S=42, K=40, T=0.5, r=0.10, σ=0.20 → C≈4.76
+    # Hull 9e Ex 13.6: S=42, K=40, T=0.5, r=0.10, sigma=0.20 -> C~=4.76
     price = bs_price(42, 40, 0.5, 0.10, 0.20, "call")
     assert math.isclose(price, 4.7594, abs_tol=1e-3)
 

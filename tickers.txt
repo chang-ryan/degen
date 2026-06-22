@@ -39,9 +39,22 @@ LITE
 AAOI
 SIVEF              # confirmed correct ticker (optics)
 
-# ── BTC miners → compute thesis ──
+# ── BTC miners → AI-compute thesis (theses/miners-ai-compute.md) ──
 RIOT
 MARA
+HUT                # Hut 8
+WULF               # TeraWulf — owned (Sep calls)
+IREN               # Iris Energy — owned (Sep calls)
+GLXY               # Galaxy Digital — owned (Sep calls)
+WGMI               # CoinShares Valkyrie miners ETF — basket proxy
+# MNRS             # listed by team — illiquid/stale quote, VERIFY before adding
+
+# ── Crypto-credit contagion watch (BTC-treasury / leverage channel) ──
+MSTR               # Strategy — BTC treasury, the leverage node; see theses/mstr-strc-contagion.md
+STRC               # Strategy variable-rate perpetual pref ("Stretch") — trading sub-par, watch
+STRK               # Strategy convertible pref
+STRF               # Strategy fixed pref
+IBIT               # spot BTC ETF — clean BTC beta benchmark
 
 # ── Energy / power ──
 BE
