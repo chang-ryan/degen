@@ -40,7 +40,7 @@ PATTERNS: list[tuple[str, str]] = [
 
 # Skipped: templates (meant to be empty), vendored code, local data, and THIS
 # file (it necessarily contains the example patterns it scans for).
-SKIP = re.compile(r"\.example\.|^external/|^data/|scripts/privacy_scan\.py$")
+SKIP = re.compile(r"\.example\.|^external/|^data/|^tests/|scripts/privacy_scan\.py$")
 
 _TERMS_FILE = Path("data/privacy_terms.txt")
 

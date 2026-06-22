@@ -348,13 +348,15 @@ def fear_greed() -> FearGreed | None:
 def buffett_indicator() -> float | None:
     """Total US market cap / GDP, as a percent. None when FRED is unavailable.
 
-    Wilshire 5000 full-cap index (≈ market value in $B) over GDP ($B SAAR). A
-    slow quarterly valuation gauge — historically ~75% (cheap) to ~200%+ (frothy).
+    Numerator: Fed Z.1 nonfinancial corporate equities (NCBEILQ027S, $millions) —
+    the standard Buffett-indicator series after FRED retired the WILL5000* family.
+    Denominator: GDP ($B SAAR). Slow quarterly valuation gauge — historically ~75%
+    (cheap) to ~200%+ (frothy).
     """
     try:
-        w = _fred_series("WILL5000PRFC")
-        g = _fred_series("GDP")
-        return float(w.iloc[-1] / g.iloc[-1] * 100)
+        mktcap = _fred_series("NCBEILQ027S")  # $ millions
+        g = _fred_series("GDP")  # $ billions SAAR
+        return float((mktcap.iloc[-1] / 1000) / g.iloc[-1] * 100)
     except Exception:
         return None
 
@@ -851,7 +853,8 @@ def fred_health() -> list[tuple[str, str, str]]:
         "BAMLH0A0HYM2": "HY OAS (credit)",
         "NFCI": "financial conditions",
         "DFII10": "10y TIPS (real rate)",
-        "WILL5000PRFC": "Wilshire (Buffett)",
+        "NCBEILQ027S": "corp equities (Buffett num.)",
+        "GDP": "GDP (Buffett denom.)",
         **{sid: key for key, (sid, _) in _CONSUMER_SERIES.items()},
     }
     out: list[tuple[str, str, str]] = []
