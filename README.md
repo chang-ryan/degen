@@ -40,6 +40,7 @@ web-scraped figures.
 | Wikipedia | S&P 500 constituents page | `macro.py` (`spx_breadth`) | The 503-name list for index-wide %>50/200dma breadth (browser UA required; symbols normalized BRK.B→BRK-B) |
 | X/Twitter syndication | `cdn.syndication.twimg.com` | `daily.py` (`fetch_xpost`) | Pull public post text into daily-brief qualitative inputs |
 | Robinhood / E*TRADE | broker APIs (MCP / OAuth) | live position reconciliation | Real book → POSITIONS.md (`degen.etrade`, Robinhood MCP) |
+| OpenRouter | `/api/v1/models` (public) | `ai_demand.py` | Frontier-intelligence $/Mtok — the AI-commoditization gauge (Jevons denominator). Token *volume* needs `OPENROUTER_API_KEY` |
 | Hand-entered | `cta_levels.json` | `macro.py` (`cta`) | CTA systematic-selling thresholds from team/sellside notes — can't be derived from free feeds; carries `asof`, goes stale |
 
 Deliberately **not** in the stack: real-time feeds, paid options data, broker
@@ -327,6 +328,18 @@ policy wants an identifying User-Agent: set `SEC_USER_AGENT` (defaults to the
 repo owner's contact).
 
 CLI: `uv run python -m degen.edgar --ticker CRM --forms 10-Q,8-K --count 4`
+
+### `degen.ai_demand`
+The AI-infra **commoditization** gauge — instruments the "does economic value
+match the infra spend in this timeframe?" thesis. Pulls OpenRouter's public
+`/models` and summarizes the **price** of frontier-class intelligence ($/Mtok)
+— the Jevons *denominator*: if intelligence approaches free, the buildout needs
+*volume* to outrun price or the ROI never shows. Snapshotted in the daily brief
+to track the deflation trend. Token **volume** (the demand numerator) is not
+free — needs `OPENROUTER_API_KEY` or manual `openrouter.ai/rankings`. Lab ARR is
+deliberately not used (contaminated by VC-subsidized burn + circular financing).
+
+CLI: `uv run python -m degen.ai_demand`
 
 ---
 

@@ -7,6 +7,15 @@ for a leveraged account, the controllable edge is risk management, not more sign
 
 ---
 
+## 0. How we work — the operating model
+The division of labor that makes this repo worth having:
+- **You (the human) are the sensor + pattern-finder.** Real-world interactions, domain skills, the team/Lee network, the "this feels off" intuition (Uber drivers on memory, friends on IREN) — that's the **alpha source**, and it's in no data feed. You gather signal and find patterns, then dump them here.
+- **The repo is the instrumentation + discipline + memory.** It converts your patterns into *falsifiable watch-items*, holds you to written invalidation levels, remembers what was concluded and why, and tells you when a signal fires.
+- **A thesis session outputs gauges, not verdicts.** "I don't think the economic value matches the infra spend in this timeframe" is a *hypothesis that names what to monitor* — not a call to act. We decide where to look, what data to inspect, what would confirm or break it over time, then instrument that. This is the regime-instrumentation philosophy ("instrument forced-selling, don't time tops") generalized to the whole research process.
+- **So every rant ends with: what's the gauge?** Each thesis names (a) the signal that confirms it, (b) the signal that breaks it (invalidation), (c) where that data lives — a `degen` panel, a manual watch, or a source to add. Then it lives in a thesis file and the daily brief watches it. Beware contaminated proxies (e.g. lab ARR for token demand — it's inflated by VC-subsidized startup burn and circular financing); prefer the cleanest signal you can instrument.
+
+---
+
 ## 1. What's in this repo
 | File | Role |
 |---|---|

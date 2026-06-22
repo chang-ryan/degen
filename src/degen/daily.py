@@ -24,6 +24,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from degen import macro
+from degen.ai_demand import AiDemand, ai_demand
 from degen.data import atm_iv, expiries, history, next_earnings, realized_vol
 
 FOCUS_DEFAULT = ("CRM", "TEAM", "SMH", "SOXX", "USO")  # active-thesis names get the full row
@@ -312,6 +313,20 @@ def _crypto_credit_block(c: macro.CryptoCredit) -> list[str]:
     return out
 
 
+def _ai_demand_block(d: AiDemand | None) -> list[str]:
+    if d is None:
+        return ["  frontier intel : n/a (OpenRouter fetch failed)"]
+    fc = f"${d.frontier_cheapest:.2f}" if d.frontier_cheapest is not None else "n/a"
+    fm = f"${d.frontier_median:.2f}" if d.frontier_median is not None else "n/a"
+    return [
+        f"  frontier intel : cheapest {fc}/Mtok · median {fm}/Mtok  "
+        f"({d.frontier_count} frontier-class / {d.model_count} models)",
+        "  read: PRICE side only (the Jevons *denominator*) — snapshot the trend; "
+        "falling = intelligence commoditizing, volume must outrun it.",
+        "  token VOLUME (the demand numerator) isn't here — needs an API key / manual rankings.",
+    ]
+
+
 # ---------- delta snapshots (atlas-brief idea: a "what changed" lede) ----------
 
 SNAP_DIR = Path("data/snapshots")
@@ -325,6 +340,7 @@ def _snapshot_state(
     fg: macro.FearGreed | None,
     m7: macro.Mag7,
     cc: macro.CryptoCredit,
+    aid: AiDemand | None,
 ) -> dict:
     legs = [lg for lg in momo.legs if lg.dd63 is not None]
     basing = sum(1 for lg in legs if lg.d5 is not None and lg.d5 >= 0)
@@ -341,6 +357,7 @@ def _snapshot_state(
         "legs_basing": basing,
         "legs_avg_offhi": avg_dd,
         "strc": cc.strc,
+        "ai_frontier": aid.frontier_cheapest if aid else None,
     }
 
 
@@ -383,6 +400,9 @@ def _deltas_block(today: dict, prior: dict | None) -> list[str]:
     a, b = today.get("legs_basing"), prior.get("legs_basing")
     if a is not None and b is not None and a != b:
         items.append(f"legs basing {b} → {a}")
+    a, b = today.get("ai_frontier"), prior.get("ai_frontier")
+    if a is not None and b is not None and abs(a - b) >= 0.05:
+        items.append(f"frontier ${b:.2f} → ${a:.2f}/Mtok")
     if not items:
         items.append("no material change in the tracked signals")
     return [f"_vs prior brief ({prior.get('date', '?')}):_  " + "  ·  ".join(items), ""]
@@ -413,10 +433,11 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
     breadth = macro.spx_breadth()
     cta = macro.cta()
     cc = macro.crypto_credit()
+    aid = ai_demand()
 
     # delta snapshot: load yesterday's state, compute "what changed", persist today's
     today = date.today()
-    today_state = _snapshot_state(today, regime, momo, breadth, fg, m7, cc)
+    today_state = _snapshot_state(today, regime, momo, breadth, fg, m7, cc, aid)
     deltas = _deltas_block(today_state, _load_prior_snapshot(today))
     _write_snapshot(today_state, today)
 
@@ -452,6 +473,10 @@ def build_brief(tickers: list[str], focus: tuple[str, ...] = FOCUS_DEFAULT) -> s
         "## Crypto / AI-infra credit",
         "```",
         *_crypto_credit_block(cc),
+        "```",
+        "## AI-infra demand (commoditization)",
+        "```",
+        *_ai_demand_block(aid),
         "```",
         "## Mag7 — concentration",
         "```",

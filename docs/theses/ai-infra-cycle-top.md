@@ -71,6 +71,28 @@ Separate the two: **magnitude** (depth) is set by valuation extension + forced-s
 
 **Measuring it in real time (don't forecast — read):** (1) credit confirms or not [the 2022-vs-2008 switch], (2) ROI gap closes or widens [the duration switch], (3) valuation distance to the 200-week MA / pre-AI base [the magnitude floor — the most-extended winners have the most air, −60-80% in a real unwind], (4) forced-selling intensity [CTA thresholds, levered-ETF/options positioning, private-credit redemptions].
 
+## The demand side — will token expenditure follow the infra?
+The whole build is infra spent *ahead* of demand, on the bet that token/inference
+demand fills it. The reframe: it's **not** "will demand come" — it is coming
+(agentic workloads are the scaler; an enterprise burned its entire 2026 AI budget
+in 4 months as coding-agent adoption went 32%→84%). It's **three separate questions**:
+1. **Magnitude** — does demand scale to *fill* ~$700B–1T/yr of capacity? (Showing up answers only part of this.)
+2. **Timing** — does it fill *before the debt forces returns*? GPUs depreciate ~3-5yr; loans need servicing now. **This is the dark-fiber killer:** late-90s telecom built fiber ahead of demand — the demand thesis was *right*, but it lagged the debt, so the builders (WorldCom, Global Crossing) went bankrupt and the fiber sold for pennies. **Being right about demand doesn't save over-levered builders if it lags the financing timeline.**
+3. **Profitability** — is the value *captured* profitably, or volume-at-collapsing-prices subsidized by investor capital? Labs are deeply unprofitable fully-loaded (OpenAI ~−$14B/2026, no profit before ~2030); inference is near-breakeven, training burns it.
+
+**Decontaminate the signal:** lab ARR is a *contaminated* demand proxy — inflated by VC-subsidized startup burn and circular financing (VCs are long the labs *and* the infra *and* funding the startups that buy the tokens). Prefer cleaner gauges:
+
+| Gauge | What it tells | Status in degen |
+|---|---|---|
+| **Frontier $/Mtok** (cost of intelligence) | the Jevons *denominator* — commoditization speed | **instrumented** — `degen.ai_demand`, snapshotted in the daily brief |
+| **Token volume** (usage, not $) | the demand *numerator* — the cleanest read | TODO — needs `OPENROUTER_API_KEY` (rankings) or manual `openrouter.ai/rankings` |
+| **Labs' burn-vs-revenue trajectory** | inflecting to profit = real; widening = subsidized | manual watch |
+| **Enterprise pilot→production depth** | durability (recurring vs one-time experiment) | manual watch |
+| **VC AI-funding flows** | when VC tightens, the startup-burn demand layer drops first | manual watch |
+| **Hyperscaler capex *guides*** | a trim citing "optimizing AI spend" = the demand-doubt crack | manual (earnings) |
+
+The honest prior (per the operating model — this is a *hypothesis to monitor*, not a verdict): the value likely **doesn't** match the infra spend in the current timeframe (the ROI gap, labs unprofitable to 2030, dark-fiber timing). These gauges are how we'd *know it's resolving* (volume compounding, labs' losses inflecting) vs *worsening* (volume stalls, or revenue decouples upward from volume = circular).
+
 ## The play (barbell — none of it requires calling the top)
 1. **Protect the parabolic winners — the most-extended single name is the #1 decision.** Take a chunk off (literally pull cost basis + profit off the table = play with house money) and/or **collar** the rest (sell upside call to finance a protective put). You don't have to call the top to lock a life-changing gain. *Note: odd-lot share counts can't be cleanly collared — trim, or hedge the cluster via SMH/SOXX puts; size off the live POSITIONS.md.*
 2. **Do NOT add AI-infra at the highs.** "Inference will be in everything" is true and is **not** a reason to buy more infra — the infra is being built *ahead* of the demand (the ROI gap). Adding = buying the most-crowded thing at peak leverage.
