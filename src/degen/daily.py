@@ -323,7 +323,9 @@ def _memory_block(m: macro.MemoryPrices | None) -> list[str]:
             if m.consensus_3q
             else ""
         )
-        out.append(f"  3Q26 forecast  : +{m.fc_3q[0]:.0f}-{m.fc_3q[1]:.0f}% QoQ{cons}  ({m.source})")
+        out.append(
+            f"  3Q26 forecast  : +{m.fc_3q[0]:.0f}-{m.fc_3q[1]:.0f}% QoQ{cons}  ({m.source})"
+        )
     if m.top_marker:
         out.append(f"  cycle-top mark : {m.top_marker}")
     if m.awaiting:
