@@ -34,6 +34,9 @@ ARM
 MRVL
 INTC
 
+# ── Mega-cap (TA / equity-ownership entries) ──
+AMZN               # TA entry: 50wMA ($232) + 200dMA + 2026 yearly open ($226) confluence — see theses/amzn-ta-equity.md
+
 # ── Optics ──
 COHR
 LITE
