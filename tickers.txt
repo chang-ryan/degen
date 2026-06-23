@@ -24,6 +24,7 @@ MU
 STX
 SNDK
 WDC
+EWY                # iShares MSCI S. Korea — ~25% Samsung + ~10% SK Hynix = live memory-duopoly + Asia-risk proxy
 
 # ── Semis: logic / CPU / GPU ──
 NVDA

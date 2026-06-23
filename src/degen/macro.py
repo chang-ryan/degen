@@ -655,6 +655,38 @@ def memory_prices() -> MemoryPrices | None:
         return None
 
 
+# ---------- memory maker tape (live proxy for the contract-price gauge) ----------
+# memory_prices() is hand-entered and lags (contract prints come quarterly). EWY
+# (iShares MSCI South Korea) is ~25% Samsung + ~10% SK Hynix — the global memory
+# duopoly — so its tape is a free, daily, *leading* read on the same complex, and
+# doubles as the Korea/Asia risk canary (KOSPI led the early-June momo unwind).
+# Rolling while contract prints stay strong = the equity market front-running a top.
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryTape:
+    ewy: float | None  # EWY level
+    d1: float | None  # 1d change
+    d5: float | None  # 5d change
+    d21: float | None  # 21d change
+    off_hi: float | None  # off its 63d high (the unwind-so-far)
+
+
+def memory_tape() -> MemoryTape:
+    """Live memory-duopoly tape via EWY (Samsung/SK Hynix proxy) — leads the prints."""
+    try:
+        s = _close("EWY", "6mo").dropna()
+        return MemoryTape(
+            ewy=float(s.iloc[-1]),
+            d1=float(s.iloc[-1] / s.iloc[-2] - 1) if len(s) > 1 else None,
+            d5=float(s.iloc[-1] / s.iloc[-6] - 1) if len(s) > 5 else None,
+            d21=float(s.iloc[-1] / s.iloc[-22] - 1) if len(s) > 21 else None,
+            off_hi=float(s.iloc[-1] / s.tail(63).max() - 1),
+        )
+    except Exception:
+        return MemoryTape(None, None, None, None, None)
+
+
 # ---------- AI ROI coverage (the Clock-A numerator) ----------
 # The blind spot: ai_demand() tracks the PRICE side (intelligence commoditizing —
 # the Jevons denominator). This tracks the REVENUE side — lab ARR run-rates vs

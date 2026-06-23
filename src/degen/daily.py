@@ -391,10 +391,22 @@ def _distribution_block(d: macro.Distribution) -> list[str]:
     return out
 
 
-def _memory_block(m: macro.MemoryPrices | None) -> list[str]:
-    if m is None:
+def _memory_block(
+    m: macro.MemoryPrices | None, tape: macro.MemoryTape | None = None
+) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    if m is None and (tape is None or tape.ewy is None):
         return ["  memory: n/a (add memory_prices.json — see memory_prices.example.json)"]
     out: list[str] = []
+    if tape is not None and tape.ewy is not None:
+        out.append(
+            f"  maker tape     : EWY {tape.ewy:.2f}  {p(tape.d1)}/1d  {p(tape.d5)}/5d  "
+            f"{p(tape.off_hi)} off-hi  — Samsung/SK Hynix proxy (live; leads the print)"
+        )
+    if m is None:
+        return out
     if m.fc_3q:
         cons = (
             f" vs consensus +{m.consensus_3q[0]:.0f}-{m.consensus_3q[1]:.0f}%"
@@ -639,6 +651,7 @@ def build_brief(
     cta = macro.cta()
     cc = macro.crypto_credit()
     mem = macro.memory_prices()
+    memtape = macro.memory_tape()
     cons = macro.consumer_health()
     dist = macro.distribution()
     froth = macro.retail_froth()
@@ -702,7 +715,7 @@ def build_brief(
         "```",
         "## Memory super-cycle (price-hike tracker)",
         "```",
-        *_memory_block(mem),
+        *_memory_block(mem, memtape),
         "```",
         "## Mag7 — concentration",
         "```",
