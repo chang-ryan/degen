@@ -69,3 +69,4 @@ XHB
 
 # ── Idio / biotech (uncorrelated to momo complex) ──
 ABVX               # obefazimod Ph3 update Jun/Jul 2026 — see theses/abvx-ph3-idio.md
+NOC                # Northrop — defense/idio; TA buy: testing rising 200wk MA (~$494), wk RSI ~18, -32% off high
