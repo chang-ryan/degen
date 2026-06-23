@@ -316,6 +316,29 @@ def _crypto_credit_block(c: macro.CryptoCredit) -> list[str]:
     return out
 
 
+def _retail_attention_block(r: macro.RetailAttention | None) -> list[str]:
+    if r is None:
+        return ["  attention: n/a (cp retail_attention.example.json → .json; `macro attention`)"]
+    out: list[str] = []
+    if r.trends_index is not None:
+        terms = ", ".join(f"{k} {v:.0f}" for k, v in r.terms[:4])
+        chg = f" ({r.trends_chg:+.0f}pp vs prior)" if r.trends_chg is not None else ""
+        out.append(
+            f"  search interest: idx {r.trends_index:.0f}/100{chg}  [{terms}]  (Google Trends)"
+        )
+    else:
+        out.append("  search interest: — (hand-enter google_trends in retail_attention.json)")
+    if r.wsb_total is not None:
+        vel = f" ({r.wsb_chg:+.0%}/24h)" if r.wsb_chg is not None else ""
+        top = ", ".join(t for t, _, _ in r.wsb_top[:6])
+        out.append(f"  WSB mentions   : {r.wsb_total:,} (top {len(r.wsb_top)}){vel}  top: {top}")
+    out.append(
+        "  read: retail-attention proxy — magnitude/lateness, not a trigger (pairs with froth). "
+        f"Refresh ~monthly; asof {r.asof}."
+    )
+    return out
+
+
 def _retail_froth_block(r: macro.RetailFroth) -> list[str]:
     def p(x: float | None, fmt: str = "+.1%") -> str:
         return format(x, fmt) if x is not None else "—"
@@ -655,6 +678,7 @@ def build_brief(
     cons = macro.consumer_health()
     dist = macro.distribution()
     froth = macro.retail_froth()
+    attn = macro.retail_attention()
     aid = ai_demand()
     roi = macro.roi_coverage()
 
@@ -724,6 +748,10 @@ def build_brief(
         "## Retail froth (the payload size, not the fuse)",
         "```",
         *_retail_froth_block(froth),
+        "```",
+        "## Retail attention (search + social — who's showing up)",
+        "```",
+        *_retail_attention_block(attn),
         "```",
         "## Book — focus (active theses)",
         "```",

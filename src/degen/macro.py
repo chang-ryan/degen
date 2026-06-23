@@ -1118,6 +1118,97 @@ def retail_froth() -> RetailFroth:
     )
 
 
+# ---------- retail attention (search + social — the froth's "who's showing up") ----------
+# A magnitude/lateness proxy (same axis as retail_froth, NOT a trigger): is the
+# non-trader public flooding in? Two cheap, slow-moving feeds, refreshed ~1-2x/month
+# (the data doesn't change day-to-day): Google Trends (hand-entered search interest
+# for a retail-attention basket) + WSB mention velocity (ApeWisdom, free/no-key).
+# Reads retail_attention.json; refresh the WSB half with refresh_retail_attention().
+
+_RETAIL_ATTENTION_FILE = Path("retail_attention.json")
+_APEWISDOM_URL = "https://apewisdom.io/api/v1.0/filter/wallstreetbets/page/1"
+
+
+@dataclass(frozen=True, slots=True)
+class RetailAttention:
+    asof: str | None
+    trends_index: float | None  # avg Google-Trends search interest across the basket (0-100)
+    trends_chg: float | None  # avg change vs prior pull (pp)
+    terms: tuple[tuple[str, float], ...]  # (term, level) for display
+    wsb_total: int | None  # total mentions across the tracked top names
+    wsb_chg: float | None  # vs ~24h-ago total (mention velocity)
+    wsb_top: tuple[tuple[str, int, int], ...]  # (ticker, mentions, mentions_24h_ago)
+    note: str | None
+
+
+def retail_attention() -> RetailAttention | None:
+    """Retail-attention proxy (Google Trends basket + WSB mentions), from cache."""
+    try:
+        cfg = json.loads(_RETAIL_ATTENTION_FILE.read_text())
+        gt = cfg.get("google_trends", {})
+        terms = gt.get("terms", {}) or {}
+        prior = gt.get("prior", {}) or {}
+        items = [(k, float(v)) for k, v in terms.items() if v is not None]
+        idx = (sum(v for _, v in items) / len(items)) if items else None
+        chgs = [
+            float(terms[k]) - float(prior[k])
+            for k in terms
+            if terms.get(k) is not None and prior.get(k) is not None
+        ]
+        trends_chg = (sum(chgs) / len(chgs)) if chgs else None
+
+        wsb = cfg.get("wsb", {})
+        top = tuple(
+            (str(t[0]), int(t[1]), int(t[2])) for t in wsb.get("top", []) if len(t) >= 3
+        )
+        wsb_total = sum(m for _, m, _ in top) or None
+        prior_total = sum(p for _, _, p in top) or None
+        wsb_chg = (wsb_total / prior_total - 1) if (wsb_total and prior_total) else None
+
+        return RetailAttention(
+            asof=cfg.get("asof"),
+            trends_index=idx,
+            trends_chg=trends_chg,
+            terms=tuple(items),
+            wsb_total=wsb_total,
+            wsb_chg=wsb_chg,
+            wsb_top=top,
+            note=cfg.get("note"),
+        )
+    except Exception:
+        return None
+
+
+def refresh_retail_attention(top_n: int = 15) -> RetailAttention | None:
+    """Pull WSB mentions (ApeWisdom, free) into retail_attention.json. Run ~1-2x/month.
+
+    Preserves the hand-entered google_trends block; only refreshes the wsb half.
+    """
+    try:
+        cfg = json.loads(_RETAIL_ATTENTION_FILE.read_text())
+    except Exception:
+        cfg = {}
+    req = urllib.request.Request(_APEWISDOM_URL, headers=_BROWSER_HEADERS)
+    data = json.loads(urllib.request.urlopen(req, timeout=15).read().decode())
+    rows = data.get("results", [])[:top_n]
+    top = [
+        [r.get("ticker"), int(r.get("mentions") or 0), int(r.get("mentions_24h_ago") or 0)]
+        for r in rows
+    ]
+    cfg["wsb"] = {
+        "asof": date.today().isoformat(),
+        "source": "ApeWisdom / r/wallstreetbets",
+        "top": top,
+    }
+    cfg.setdefault(
+        "google_trends",
+        {"source": "trends.google.com US 12m — hand-entered 0-100", "terms": {}, "prior": {}},
+    )
+    cfg["asof"] = date.today().isoformat()
+    _RETAIL_ATTENTION_FILE.write_text(json.dumps(cfg, indent=2))
+    return retail_attention()
+
+
 # ---------- formatting ----------
 
 _STYLE = {
@@ -1159,6 +1250,15 @@ def main() -> None:
             print(f"  [{mark}] {sid:14} {detail}")
         ok = sum(1 for _, s, _ in rows if s == "ok")
         print(f"  → {ok}/{len(rows)} series live")
+        return
+    if "attention" in sys.argv[1:]:
+        print("=== refreshing retail attention (WSB via ApeWisdom) ===")
+        ra = refresh_retail_attention()
+        if ra and ra.wsb_top:
+            print(f"  WSB top: {', '.join(f'{t}({m})' for t, m, _ in ra.wsb_top[:8])}")
+            print(f"  wrote {_RETAIL_ATTENTION_FILE} (asof {ra.asof}); fill google_trends by hand")
+        else:
+            print("  refresh failed")
         return
     print(build())
 
