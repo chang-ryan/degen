@@ -93,8 +93,7 @@ def _regime_panel(r: macro.Regime | None) -> dict[str, Any]:
         "extra": {"stress": r.stress_count, "available": r.available_count},
         "rows": rows,
         "note": (
-            "Mechanical label can mislead while internals rot — read the signals, "
-            "not the headline."
+            "Mechanical label can mislead while internals rot — read the signals, not the headline."
         ),
     }
 
@@ -321,6 +320,11 @@ def _credit_stress_panel(c: macro.CreditStress | None) -> dict[str, Any]:
         "calm": "good",
     }.get(c.band, "neutral")
     disp = f"{c.dispersion:.1f}pp" if c.dispersion is not None else "—"
+    # row colors + the de-beta'd excess come from the gauge (single-sourced w/ .band).
+    st = c.states
+    mkt = c.market_offhi
+    bdc_ex = c.bdc_offhi - mkt if (c.bdc_offhi is not None and mkt is not None) else None
+    banks_ex = c.banks_offhi - mkt if (c.banks_offhi is not None and mkt is not None) else None
     return {
         "key": "credit_stress",
         "title": "Credit quality ladder",
@@ -333,7 +337,7 @@ def _credit_stress_panel(c: macro.CreditStress | None) -> dict[str, Any]:
                 "label": "IG OAS",
                 "value": _pct(c.ig_oas),
                 "delta": f"{_f(c.ig_chg, '+.2f')}pp/mo",
-                "state": "bad" if (c.ig_oas or 0) > 1.0 else "good",
+                "state": st["ig"],
             },
             {"label": "BB OAS", "value": _pct(c.bb_oas)},
             {"label": "HY OAS", "value": _pct(c.hy_oas)},
@@ -341,25 +345,23 @@ def _credit_stress_panel(c: macro.CreditStress | None) -> dict[str, Any]:
                 "label": "CCC OAS",
                 "value": _pct(c.ccc_oas),
                 "delta": f"{_f(c.ccc_chg, '+.2f')}pp/mo",
-                "state": "bad",
+                "state": st["ccc"],
             },
             {
                 "label": "Private-credit / BDC",
                 "value": f"{_f(c.bdc_offhi, '+.1%')} off-hi",
-                "delta": f"{_f(c.bdc_5d, '+.1%')} 5d",
-                "state": "bad" if (c.bdc_offhi or 0) < -0.05 else "warn",
+                "delta": f"{_f(bdc_ex, '+.1%')} ex-SPY",
+                "state": st["bdc"],
             },
             {"label": "Lev loans (BKLN)", "value": f"{_f(c.loans_offhi, '+.1%')} off-hi"},
             {
                 "label": "Regional banks (KRE)",
                 "value": f"{_f(c.banks_offhi, '+.1%')} off-hi",
-                "state": "bad" if (c.banks_offhi or 0) < -0.08 else None,
+                "delta": f"{_f(banks_ex, '+.1%')} ex-SPY",
+                "state": st["banks"],
             },
         ],
-        "note": (
-            "CCC + private credit cracking while IG/banks calm = early/confined. "
-            "IG widening or banks breaking = systemic."
-        ),
+        "note": macro.CreditStress.SCOPE,
     }
 
 
@@ -411,6 +413,7 @@ def _private_credit_panel(pc: macro.PrivateCredit | None) -> dict[str, Any]:
     if pc is None:
         return _na_card("private_credit", "Private credit / AI-infra debt", "clockB")
     status = {"cracking": "bad", "stressed": "warn", "calm": "good"}.get(pc.band, "neutral")
+    st = pc.states
     worst_pc = f"{pc.pc_worst[0]} {pc.pc_worst[1]:+.0%}" if pc.pc_worst else "—"
     worst_inf = f"{pc.infra_worst[0]} {pc.infra_worst[1]:+.0%}" if pc.infra_worst else "—"
     worst_off = min([v for v in (pc.pc_offhi, pc.infra_offhi) if v is not None], default=None)
@@ -430,21 +433,18 @@ def _private_credit_panel(pc: macro.PrivateCredit | None) -> dict[str, Any]:
                 "label": "Private credit (BDCs)",
                 "value": f"{_f(pc.pc_offhi, '+.1%')} off-hi",
                 "delta": f"{_f(pc.pc_5d, '+.1%')} 5d",
-                "state": "bad" if (pc.pc_offhi or 0) < -0.07 else "warn",
+                "state": st["pc"],
             },
-            {"label": "PC worst name", "value": worst_pc, "state": "bad"},
+            {"label": "PC worst name", "value": worst_pc, "state": st["pc"]},
             {
                 "label": "AI-infra debt",
                 "value": f"{_f(pc.infra_offhi, '+.1%')} off-hi",
                 "delta": f"{_f(pc.infra_5d, '+.1%')} 5d",
-                "state": "bad" if (pc.infra_offhi or 0) < -0.07 else "warn",
+                "state": st["infra"],
             },
-            {"label": "Infra worst name", "value": worst_inf, "state": "bad"},
+            {"label": "Infra worst name", "value": worst_inf, "state": st["infra"]},
         ],
-        "note": (
-            "Equity proxy for the shadow-bank / AI-infra-debt edge (CDS/CLO/NAV "
-            "are paywalled). Confirms credit_stress."
-        ),
+        "note": macro.PrivateCredit.SCOPE,
     }
 
 
@@ -458,7 +458,7 @@ def _neocloud_panel(n: macro.Neocloud | None) -> dict[str, Any]:
             "label": t,
             "value": f"{off:+.1%} off-hi",
             "delta": f"{_f(d5, '+.1%')} 5d",
-            "state": "bad" if off <= -0.15 else "warn" if off <= -0.07 else None,
+            "state": n.name_state(off),
         }
         for t, off, d5 in n.names
     ]
@@ -475,10 +475,7 @@ def _neocloud_panel(n: macro.Neocloud | None) -> dict[str, Any]:
             "sub": f"{n.n_cracking}/{n.n} cracking >15% · {n.band}",
         },
         "rows": rows,
-        "note": (
-            "Levered GPU-cloud operators (CRWV/IREN/…) — the most faith-dependent corner; "
-            "cracks first. Bifurcation = name-specific, not a complex meltdown yet."
-        ),
+        "note": macro.Neocloud.SCOPE,
     }
 
 
@@ -705,17 +702,17 @@ def _memory_prices_panel(m: macro.MemoryPrices | None) -> dict[str, Any]:
 
 def _memory_tape_panel(t: macro.MemoryTape | None) -> dict[str, Any]:
     if t is None or t.ewy is None:
-        return _na_card("memory_tape", "Memory tape (live proxy)", "backdrop")
+        return _na_card("memory_tape", "Memory tape (Korea / EWY)", "backdrop")
     status = "bad" if (t.d1 or 0) < -0.03 else "warn" if (t.off_hi or 0) < -0.05 else "good"
     return {
         "key": "memory_tape",
-        "title": "Memory tape (live proxy)",
+        "title": "Memory tape (Korea / EWY)",
         "group": "backdrop",
         "kind": "metric",
         "status": status,
         "headline": {
             "value": f"EWY {t.ewy:.1f}",
-            "label": "Samsung / SK Hynix proxy",
+            "label": "Korea-beta canary · memory tilt",
             "sub": f"{_f(t.d1, '+.1%')} 1d",
         },
         "rows": [
@@ -736,7 +733,82 @@ def _memory_tape_panel(t: macro.MemoryTape | None) -> dict[str, Any]:
                 "state": "bad" if (t.off_hi or 0) < -0.05 else "warn",
             },
         ],
-        "note": "Live memory-duopoly proxy — leads the contract print + Asia risk.",
+        "note": macro.MemoryTape.SCOPE,
+    }
+
+
+def _labor_panel(lab: macro.Labor | None) -> dict[str, Any]:
+    """Jobs = the consumer income engine (Clock A); Sahm rule = the recession trigger."""
+    if lab is None:
+        return _na_card("labor", "Labor / jobs", "clockA")
+    status = {"recession signal": "bad", "softening": "warn", "firm": "good"}.get(
+        lab.band, "neutral"
+    )
+    return {
+        "key": "labor",
+        "title": "Labor / jobs",
+        "group": "clockA",
+        "kind": "metric",
+        "status": status,
+        "headline": {
+            "value": _f(lab.sahm, ".2f"),
+            "label": "Sahm rule (≥0.5 = recession)",
+            "sub": f"unemployment {_f(lab.unrate, '.1f')}% · {lab.band}",
+        },
+        "rows": [
+            {
+                "label": "Unemployment",
+                "value": f"{_f(lab.unrate, '.1f')}%",
+                "delta": f"{_f(lab.unrate_chg, '+.1f')}pp/yr",
+                "state": "warn" if (lab.unrate_chg or 0) > 0.3 else None,
+            },
+            {
+                "label": "Payrolls MoM",
+                "value": f"{_f(lab.payrolls_mom, '+,.0f')}k",
+                "state": "bad" if (lab.payrolls_mom or 1) < 0 else "good",
+            },
+            {"label": "Quits rate", "value": f"{_f(lab.quits, '.1f')}%"},
+            {"label": "Job openings", "value": f"{_f(lab.openings, ',.0f')}k"},
+            {"label": "Sahm value", "value": _f(lab.sahm, ".2f"), "state": status},
+            {
+                "label": "IT-services emp YoY",
+                "value": _f(lab.tech_yoy, "+.1%"),
+                "state": "warn" if (lab.tech_yoy or 0) < 0 else None,
+            },
+        ],
+        "note": macro.Labor.SCOPE,
+    }
+
+
+def _makers_panel(mak: macro.Makers | None) -> dict[str, Any]:
+    """The direct memory/semicap supply makers — de-beta'd equity-beta health."""
+    if mak is None or mak.n == 0:
+        return _na_card("makers", "Makers (supply oligopoly)", "backdrop")
+    ex = mak.excess_offhi
+    state = "bad" if (ex or 0) <= -0.07 else "warn" if (ex or 0) <= -0.03 else None
+    worst = mak.names[0] if mak.names else None
+    return {
+        "key": "makers",
+        "title": "Makers (supply oligopoly)",
+        "group": "backdrop",
+        "kind": "metric",
+        "status": state or "neutral",
+        "headline": {
+            "value": _f(ex, "+.1%"),
+            "label": "basket off-hi ex-SPY",
+            "sub": f"raw {_f(mak.avg_offhi, '+.1%')} · n={mak.n}",
+        },
+        "rows": [
+            {"label": "Basket off-hi", "value": _f(mak.avg_offhi, "+.1%")},
+            {"label": "Excess vs SPY", "value": _f(ex, "+.1%"), "state": state},
+            {"label": "Avg 5d", "value": _f(mak.avg_5d, "+.1%")},
+            {
+                "label": "Worst name",
+                "value": f"{worst[0]} {worst[1]:+.0%}" if worst else "—",
+                "state": "bad",
+            },
+        ],
+        "note": macro.Makers.SCOPE,
     }
 
 
@@ -871,6 +943,8 @@ def build_payload(when: date | None = None) -> dict[str, Any]:
     froth = safe(macro.retail_froth, "retail_froth")
     aid = safe(ai_demand, "ai_demand")
     roi = safe(macro.roi_coverage, "roi_coverage")
+    lab = safe(macro.labor, "labor")
+    mak = safe(macro.makers, "makers")
 
     groups = {
         "header": [_regime_panel(regime), _fear_greed_panel(fg)],
@@ -879,6 +953,7 @@ def build_payload(when: date | None = None) -> dict[str, Any]:
             _ai_demand_panel(aid),
             _consumer_panel(cons),
             _distribution_panel(dist),
+            _labor_panel(lab),
         ],
         "clockB": [
             _crypto_credit_panel(cc),
@@ -899,6 +974,7 @@ def build_payload(when: date | None = None) -> dict[str, Any]:
             _cross_asset_panel(ca),
             _memory_prices_panel(mem),
             _memory_tape_panel(memtape),
+            _makers_panel(mak),
         ],
     }
 
