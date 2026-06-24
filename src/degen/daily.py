@@ -388,10 +388,23 @@ def _private_credit_block(pc: macro.PrivateCredit) -> list[str]:
     return [
         f"  private credit : {p(pc.pc_offhi)} off-hi ({p(pc.pc_5d)}/5d, n={pc.pc_n})  "
         f"{worst(pc.pc_worst)}  — BDCs + Ares/Blue Owl",
-        f"  AI-infra debt  : {p(pc.infra_offhi)} off-hi ({p(pc.infra_5d)}/5d, n={pc.infra_n})  "
-        f"{worst(pc.infra_worst)}  — neocloud/datacenter (CRWV/ORCL/VRT)",
+        f"  build debt     : {p(pc.infra_offhi)} off-hi ({p(pc.infra_5d)}/5d, n={pc.infra_n})  "
+        f"{worst(pc.infra_worst)}  — Oracle/datacenter (ORCL/VRT/DLR); neoclouds → own panel",
         f"  read: [{pc.band}] equity proxy for the shadow-bank/AI-infra-debt bomb (CDS/CLO/NAV "
         "are paywalled). Confirms credit_stress; not a standalone trigger.",
+    ]
+
+
+def _neocloud_block(nc: macro.Neocloud) -> list[str]:
+    if nc.n == 0:
+        return ["  neocloud: n/a"]
+    avg = f"{nc.avg_offhi:+.1%}" if nc.avg_offhi is not None else "—"
+    worst = "  ".join(f"{t} {o:+.0%}" for t, o, _ in nc.names[:4])
+    return [
+        f"  neocloud edge  : avg {avg} off-hi ({nc.n_cracking}/{nc.n} cracking >15%)  [{nc.band}]",
+        f"  most-stressed  : {worst}",
+        "  read: levered GPU-cloud operators (CRWV/IREN/…) — most faith-dependent corner, cracks "
+        "first. Bifurcation = name-specific, not a complex meltdown yet. `macro neocloud` = full.",
     ]
 
 
@@ -732,6 +745,7 @@ def build_brief(
     cc = macro.crypto_credit()
     creds = macro.credit_stress()
     privc = macro.private_credit()
+    nclo = macro.neocloud()
     funding = macro.funding_stress()
     mem = macro.memory_prices()
     memtape = macro.memory_tape()
@@ -796,6 +810,10 @@ def build_brief(
         "## Private credit (Clock B — shadow-bank / AI-infra-debt edge)",
         "```",
         *_private_credit_block(privc),
+        "```",
+        "## Neocloud watch (Clock B — the levered GPU-cloud operators)",
+        "```",
+        *_neocloud_block(nclo),
         "```",
         "## Funding plumbing (Clock B — repo / liquidity)",
         "```",

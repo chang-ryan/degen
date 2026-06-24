@@ -74,7 +74,12 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
     def privcred() -> str:
         pc = macro.private_credit()
         inf = f"{pc.infra_offhi:+.0%}" if pc.infra_offhi is not None else "—"
-        return f"PC {pc.pc_offhi:+.0%}, infra-debt {inf} [{pc.band}]" if pc.pc_n else "n/a"
+        return f"PC {pc.pc_offhi:+.0%}, build-debt {inf} [{pc.band}]" if pc.pc_n else "n/a"
+
+    def neoclouds() -> str:
+        nc = macro.neocloud()
+        a = f"{nc.avg_offhi:+.0%}" if nc.avg_offhi is not None else "—"
+        return f"avg {a} off-hi, {nc.n_cracking}/{nc.n} cracking [{nc.band}]" if nc.n else "n/a"
 
     def ai() -> str:
         d = ai_demand.ai_demand()
@@ -112,6 +117,7 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         ("credit stress (ladder/edge)", credit),
         ("funding plumbing (repo/RRP)", funding),
         ("private credit (BDC/infra)", privcred),
+        ("neocloud watch (operators)", neoclouds),
         ("Wikipedia — SPX list", spx),
         ("SEC EDGAR — resolve", edgar_resolve),
         ("X syndication — fetch", xpost),

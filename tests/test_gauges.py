@@ -17,6 +17,7 @@ from degen.macro import (
     CryptoCredit,
     Distribution,
     FundingStress,
+    Neocloud,
     PrivateCredit,
     RoiCoverage,
 )
@@ -128,6 +129,17 @@ def test_private_credit_bands() -> None:
     assert _pc(-0.09, -0.19).band == "cracking"  # live: infra-debt edge cracking
     assert _pc(-0.09, -0.04).band == "stressed"  # PC complex stressed, infra ok
     assert _pc(-0.03, -0.02).band == "calm"
+
+
+def _neo(avg: float) -> Neocloud:
+    return Neocloud(avg_offhi=avg, avg_5d=None, n=9, n_cracking=2, names=())
+
+
+def test_neocloud_bands() -> None:
+    assert _neo(-0.16).band == "cracking"
+    assert _neo(-0.09).band == "stressed"  # live: bifurcated, avg ~-9%
+    assert _neo(-0.03).band == "calm"
+    assert Neocloud(None, None, 0, 0, ()).band == "n/a"
 
 
 def test_mtok_pricing_conversion() -> None:

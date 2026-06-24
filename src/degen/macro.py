@@ -1027,7 +1027,7 @@ def funding_stress() -> FundingStress:
 # Equity-noisy, so read it as confirmation of the spread/funding leaks, not alone.
 
 _PC_COMPLEX = ("ARCC", "BXSL", "FSK", "BIZD", "OBDC", "ARES", "OWL")  # BDCs + PC sponsors
-_INFRA_DEBT = ("CRWV", "ORCL", "VRT", "NBIS")  # neocloud / debt-funded datacenter build
+_INFRA_DEBT = ("ORCL", "VRT", "DLR")  # debt-funded build: Oracle + power/datacenter REIT
 
 
 @dataclass(frozen=True, slots=True)
@@ -1086,6 +1086,67 @@ def private_credit() -> PrivateCredit:
         infra_5d=inf_5d,
         infra_n=inf_n,
         infra_worst=inf_worst,
+    )
+
+
+# ---------- neocloud watch (Clock B — the sharpest, most faith-dependent edge) ----------
+# The levered GPU-cloud operators: pure neoclouds (CRWV/NBIS/BRUN) + the BTC miners
+# pivoting to AI compute (IREN/WULF/CORZ/APLD/CIFR/HUT). The purest 2000-telecom
+# analog — debt/equity-financed compute capacity betting demand shows up. The *first*
+# place the AI-capex-ROI question bites. Bifurcation (some wrecked, holders fine) =
+# name-specific stress, not yet a complex meltdown. Equity proxy; `macro neocloud` = full table.
+_NEOCLOUDS = {
+    "CRWV": "CoreWeave — flagship GPU cloud",
+    "NBIS": "Nebius — Amsterdam AI cloud (ex-Yandex)",
+    "BRUN": "Boost Run — micro neocloud (founded 2025, 3 employees)",
+    "IREN": "IREN — BTC miner → AI compute",
+    "WULF": "TeraWulf — miner → AI compute",
+    "CORZ": "Core Scientific — hosts CoreWeave",
+    "APLD": "Applied Digital — AI/HPC hosting",
+    "CIFR": "Cipher — miner → AI compute",
+    "HUT": "Hut 8 — miner → AI compute",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Neocloud:
+    avg_offhi: float | None  # basket avg off-63d-high
+    avg_5d: float | None
+    n: int
+    n_cracking: int  # how many are >15% off their high
+    names: tuple[tuple[str, float, float | None], ...]  # (ticker, off-hi, 5d), worst-first
+
+    @property
+    def band(self) -> str:
+        if self.avg_offhi is None:
+            return "n/a"
+        if self.avg_offhi <= -0.15:
+            return "cracking"
+        if self.avg_offhi <= -0.07:
+            return "stressed"
+        return "calm"
+
+
+def neocloud() -> Neocloud:
+    """The levered AI-compute operators — the sharpest, most faith-dependent Clock-B edge."""
+    rows: list[tuple[str, float, float | None]] = []
+    for t in _NEOCLOUDS:
+        try:
+            s = _close(t, "6mo").dropna()
+            off = float(s.iloc[-1] / s.tail(63).max() - 1)
+            d5 = float(s.iloc[-1] / s.iloc[-6] - 1) if len(s) > 5 else None
+            rows.append((t, off, d5))
+        except Exception:
+            continue
+    rows.sort(key=lambda r: r[1])  # worst off-high first
+    offs = [o for _, o, _ in rows]
+    d5s = [d for _, _, d in rows if d is not None]
+    return Neocloud(
+        avg_offhi=(sum(offs) / len(offs)) if offs else None,
+        avg_5d=(sum(d5s) / len(d5s)) if d5s else None,
+        n=len(rows),
+        n_cracking=sum(1 for o in offs if o <= -0.15),
+        names=tuple(rows),
     )
 
 
@@ -1482,6 +1543,14 @@ def main() -> None:
             print(f"  [{mark}] {sid:14} {detail}")
         ok = sum(1 for _, s, _ in rows if s == "ok")
         print(f"  → {ok}/{len(rows)} series live")
+        return
+    if "neocloud" in sys.argv[1:]:
+        nc = neocloud()
+        avg = f"{nc.avg_offhi:+.1%}" if nc.avg_offhi is not None else "—"
+        print(f"=== neocloud [{nc.band}] avg {avg} off-hi · {nc.n_cracking}/{nc.n} cracking ===")
+        for t, off, d5 in nc.names:
+            d5s = f"{d5:+6.1%}" if d5 is not None else "   —  "
+            print(f"  {t:5} off-hi {off:+6.1%}  5d {d5s}   {_NEOCLOUDS.get(t, '')}")
         return
     if "attention" in sys.argv[1:]:
         print("=== refreshing retail attention (WSB via ApeWisdom) ===")
