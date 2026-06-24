@@ -11,7 +11,7 @@ import importlib.util
 import pathlib
 
 from degen.ai_demand import _mtok
-from degen.macro import ConsumerHealth, CryptoCredit, Distribution, RoiCoverage
+from degen.macro import ConsumerHealth, CreditStress, CryptoCredit, Distribution, RoiCoverage
 
 
 def _cc(strc: float | None) -> CryptoCredit:
@@ -77,6 +77,23 @@ def test_roi_coverage_closing() -> None:
     assert _roi(1.50, 0.60).closing is True  # ARR outgrowing capex → gap closing
     assert _roi(0.20, 0.60).closing is False  # capex outrunning ARR → gap widening
     assert _roi(None, 0.60).closing is None
+
+
+def _credit(ig: float, ccc: float, bdc: float | None, banks: float | None) -> CreditStress:
+    return CreditStress(
+        ig_oas=ig, bb_oas=1.5, hy_oas=2.6, ccc_oas=ccc, ccc_chg=None, ig_chg=None,
+        bdc_offhi=bdc, bdc_5d=None, loans_offhi=-0.01, banks_offhi=banks, stale=(),
+    )
+
+
+def test_credit_stress_bands() -> None:
+    # live read: IG tight, CCC dispersion wide, private credit rolling, banks calm
+    leak = _credit(0.74, 9.47, -0.079, 0.0)
+    assert round(leak.dispersion, 2) == 8.73
+    assert leak.band == "leaking (bottom edge)"
+    assert _credit(1.20, 9.47, -0.079, 0.0).band == "spreading (quality/banks)"  # IG widened
+    assert _credit(0.74, 9.47, -0.02, -0.10).band == "spreading (quality/banks)"  # banks broke
+    assert _credit(0.74, 5.0, -0.01, 0.0).band == "calm"  # tight dispersion, edge fine
 
 
 def test_mtok_pricing_conversion() -> None:

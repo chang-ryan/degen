@@ -857,6 +857,103 @@ def crypto_credit() -> CryptoCredit:
     )
 
 
+# ---------- credit stress (Clock B — the quality ladder + the levered edge) ----------
+# crypto_credit is ONE edge; this is the broad Clock B. The single HY OAS number
+# (in the regime panel) hides where cracks show first: (1) the quality ladder —
+# CCC (the marginal borrower) blows out before IG, so CCC-vs-IG *dispersion* leads
+# the index; (2) the levered/shadow-bank edge — private-credit/BDCs, leveraged
+# loans, regional banks — where this cycle's AI-infra/datacenter leverage sits.
+# Confined to the bottom (CCC + private credit cracking, IG + banks calm) = early.
+# IG widening or banks breaking = stress reaching quality = systemic. FRED + yfinance.
+
+_CREDIT_LADDER = {
+    "ig": ("BAMLC0A0CM", 21),  # investment-grade OAS — the "quality" rung
+    "bb": ("BAMLH0A1HYBB", 21),  # BB (top of junk)
+    "hy": ("BAMLH0A0HYM2", 21),  # broad HY OAS (also the regime credit vote)
+    "ccc": ("BAMLH0A3HYC", 21),  # CCC & lower — the marginal borrower, cracks first
+}
+_LEVERED_EDGE = ("BIZD", "BKLN", "KRE")  # private-credit/BDC · leveraged loans · regional banks
+
+
+@dataclass(frozen=True, slots=True)
+class CreditStress:
+    ig_oas: float | None  # %
+    bb_oas: float | None
+    hy_oas: float | None
+    ccc_oas: float | None
+    ccc_chg: float | None  # CCC change vs ~1mo, pp (rising = bottom cracking)
+    ig_chg: float | None  # IG change vs ~1mo, pp (rising = stress reaching quality)
+    bdc_offhi: float | None  # BIZD off 63d high (private-credit / BDC)
+    bdc_5d: float | None
+    loans_offhi: float | None  # BKLN (leveraged loans)
+    banks_offhi: float | None  # KRE (regional banks)
+    stale: tuple[str, ...]
+
+    @property
+    def dispersion(self) -> float | None:
+        """CCC minus IG (pp). Wide = stress concentrated at the bottom (early crack)."""
+        if self.ccc_oas is None or self.ig_oas is None:
+            return None
+        return self.ccc_oas - self.ig_oas
+
+    @property
+    def band(self) -> str:
+        # systemic: stress reached quality (IG) or the banking system (KRE)
+        if (self.ig_oas is not None and self.ig_oas > 1.0) or (
+            self.banks_offhi is not None and self.banks_offhi < -0.08
+        ):
+            return "spreading (quality/banks)"
+        # bottom-edge leak: private credit or the CCC tier cracking while the top is calm
+        disp = self.dispersion
+        if (self.bdc_offhi is not None and self.bdc_offhi < -0.05) or (
+            disp is not None and disp > 7
+        ):
+            return "leaking (bottom edge)"
+        return "calm"
+
+
+def credit_stress() -> CreditStress:
+    """Broad Clock B — corporate quality ladder (FRED) + the levered/shadow-bank edge."""
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    stale: list[str] = []
+    for key, (sid, per) in _CREDIT_LADDER.items():
+        latest, prior, is_stale = _fred_metric(sid, per)
+        vals[key] = (latest, prior)
+        if is_stale:
+            stale.append(sid)
+
+    def _chg(key: str) -> float | None:
+        latest, prior = vals[key]
+        return (latest - prior) if (latest is not None and prior is not None) else None
+
+    def _edge(ticker: str) -> tuple[float | None, float | None]:
+        try:
+            s = _close(ticker, "6mo").dropna()
+            offhi = float(s.iloc[-1] / s.tail(63).max() - 1)
+            d5 = float(s.iloc[-1] / s.iloc[-6] - 1) if len(s) > 5 else None
+            return offhi, d5
+        except Exception:
+            return None, None
+
+    bdc_offhi, bdc_5d = _edge("BIZD")
+    loans_offhi, _ = _edge("BKLN")
+    banks_offhi, _ = _edge("KRE")
+
+    return CreditStress(
+        ig_oas=vals["ig"][0],
+        bb_oas=vals["bb"][0],
+        hy_oas=vals["hy"][0],
+        ccc_oas=vals["ccc"][0],
+        ccc_chg=_chg("ccc"),
+        ig_chg=_chg("ig"),
+        bdc_offhi=bdc_offhi,
+        bdc_5d=bdc_5d,
+        loans_offhi=loans_offhi,
+        banks_offhi=banks_offhi,
+        stale=tuple(stale),
+    )
+
+
 # ---------- consumer health (the demand base that ultimately funds AI) ----------
 # Almost every AI-funding dollar traces back to the consumer (ad rev, retail) or to
 # capital markets (the untethered, fragile part). This panel instruments the consumer

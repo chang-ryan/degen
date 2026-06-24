@@ -355,6 +355,29 @@ def _retail_froth_block(r: macro.RetailFroth) -> list[str]:
     ]
 
 
+def _credit_stress_block(c: macro.CreditStress) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    def pct(x: float | None) -> str:
+        return f"{x:.2f}%" if x is not None else "—"
+
+    disp = f"{c.dispersion:.1f}pp" if c.dispersion is not None else "—"
+    cccc = f" ({p(c.ccc_chg, '+.2f')}pp/mo)" if c.ccc_chg is not None else ""
+    out = [
+        f"  quality ladder : IG {pct(c.ig_oas)}  BB {pct(c.bb_oas)}  HY {pct(c.hy_oas)}  "
+        f"CCC {pct(c.ccc_oas)}{cccc}",
+        f"  dispersion     : CCC−IG {disp}  [{c.band}]  (wide = stress stuck at the bottom)",
+        f"  levered edge   : private-credit/BDC {p(c.bdc_offhi)} off-hi ({p(c.bdc_5d)}/5d) · "
+        f"loans {p(c.loans_offhi)} · banks {p(c.banks_offhi)} off-hi",
+        "  read: CCC + private credit cracking while IG/banks calm = early/confined. IG "
+        "widening or banks breaking = stress reaching quality (systemic). Pairs w/ crypto_credit.",
+    ]
+    if c.stale:
+        out.append(f"  [stale: {','.join(c.stale)}]")
+    return out
+
+
 def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
     def p(x: float | None, fmt: str = "+.1%") -> str:
         return format(x, fmt) if x is not None else "—"
@@ -673,6 +696,7 @@ def build_brief(
     breadth = macro.spx_breadth()
     cta = macro.cta()
     cc = macro.crypto_credit()
+    creds = macro.credit_stress()
     mem = macro.memory_prices()
     memtape = macro.memory_tape()
     cons = macro.consumer_health()
@@ -728,6 +752,10 @@ def build_brief(
         "## Crypto / AI-infra credit",
         "```",
         *_crypto_credit_block(cc),
+        "```",
+        "## Credit stress (Clock B — quality ladder + levered edge)",
+        "```",
+        *_credit_stress_block(creds),
         "```",
         "## AI-infra demand (commoditization)",
         "```",
