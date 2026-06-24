@@ -54,7 +54,8 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
     def makers() -> str:
         m = macro.makers()
         a = f"{m.avg_offhi:+.0%}" if m.avg_offhi is not None else "—"
-        return f"{m.n} live, avg {a} off-hi" if m.n else "n/a"
+        ex = f", {m.excess_offhi:+.0%} vs SPY" if m.excess_offhi is not None else ""
+        return f"{m.n} live, avg {a} off-hi{ex}" if m.n else "n/a"
 
     def distribution() -> str:
         d = macro.distribution()
@@ -121,7 +122,7 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         ("FRED — regime series", fred_regime),
         ("FRED — consumer series", consumer),
         ("FRED — labor (Sahm/JOLTS)", labor),
-        ("makers (foreign tickers)", makers),
+        ("semicap/memory complex", makers),
         ("FRED — distribution series", distribution),
         ("CNN — Fear & Greed", fng),
         ("OpenRouter — ai_demand", ai),

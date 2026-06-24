@@ -12,15 +12,18 @@ import pathlib
 
 from degen.ai_demand import _mtok
 from degen.macro import (
+    _SIGNAL_WEIGHTS,
     ConsumerHealth,
     CreditStress,
     CryptoCredit,
     Distribution,
     FundingStress,
     Labor,
+    Makers,
     Neocloud,
     PrivateCredit,
     RoiCoverage,
+    _verdict,
 )
 
 
@@ -89,10 +92,13 @@ def test_roi_coverage_closing() -> None:
     assert _roi(None, 0.60).closing is None
 
 
-def _credit(ig: float, ccc: float, bdc: float | None, banks: float | None) -> CreditStress:
+def _credit(
+    ig: float, ccc: float, bdc: float | None, banks: float | None, market: float | None = None
+) -> CreditStress:
     return CreditStress(
         ig_oas=ig, bb_oas=1.5, hy_oas=2.6, ccc_oas=ccc, ccc_chg=None, ig_chg=None,
         bdc_offhi=bdc, bdc_5d=None, loans_offhi=-0.01, banks_offhi=banks, stale=(),
+        market_offhi=market,
     )
 
 
@@ -104,6 +110,15 @@ def test_credit_stress_bands() -> None:
     assert _credit(1.20, 9.47, -0.079, 0.0).band == "spreading (quality/banks)"  # IG widened
     assert _credit(0.74, 9.47, -0.02, -0.10).band == "spreading (quality/banks)"  # banks broke
     assert _credit(0.74, 5.0, -0.01, 0.0).band == "calm"  # tight dispersion, edge fine
+
+
+def test_credit_stress_debeta() -> None:
+    # #1: banks -10% but the whole market is -10% → banks_excess 0 = not bank-specific
+    assert _credit(0.74, 5.0, -0.02, -0.10, market=-0.10).band == "calm"
+    # banks -10% with SPY flat → -10pp excess = real bank stress (systemic)
+    assert _credit(0.74, 5.0, -0.02, -0.10, market=0.0).band == "spreading (quality/banks)"
+    # BDC -8% but SPY -6% → only -2pp excess = not a private-credit leak
+    assert _credit(0.74, 5.0, -0.08, 0.0, market=-0.06).band == "calm"
 
 
 def _funding(sofr_iorb: float, rrp: float) -> FundingStress:
@@ -119,28 +134,50 @@ def test_funding_stress_bands() -> None:
     assert _funding(-0.04, 400.0).band == "ample"  # buffer intact, repo calm
 
 
-def _pc(pc_off: float, infra_off: float) -> PrivateCredit:
+def _pc(pc_off: float, infra_off: float, market: float | None = None) -> PrivateCredit:
     return PrivateCredit(
         pc_offhi=pc_off, pc_5d=None, pc_n=7, pc_worst=("OWL", pc_off),
         infra_offhi=infra_off, infra_5d=None, infra_n=4, infra_worst=("ORCL", infra_off),
+        market_offhi=market,
     )
 
 
 def test_private_credit_bands() -> None:
+    # no market baseline → absolute off-high thresholds (back-compat)
     assert _pc(-0.09, -0.19).band == "cracking"  # live: infra-debt edge cracking
     assert _pc(-0.09, -0.04).band == "stressed"  # PC complex stressed, infra ok
     assert _pc(-0.03, -0.02).band == "calm"
 
 
-def _neo(avg: float) -> Neocloud:
-    return Neocloud(avg_offhi=avg, avg_5d=None, n=9, n_cracking=2, names=())
+def test_private_credit_debeta() -> None:
+    # #1: infra -20% but SPY -14% → only -6pp excess = NOT a standalone crack
+    assert _pc(-0.05, -0.20, market=-0.14).band == "stressed"
+    # infra -19% with SPY flat → -19pp excess = real cracking
+    assert _pc(-0.05, -0.19, market=-0.01).band == "cracking"
+    assert _pc(-0.06, -0.06, market=-0.05).band == "calm"  # both ~-1pp vs SPY
+
+
+def _neo(avg: float, market: float | None = None) -> Neocloud:
+    return Neocloud(avg_offhi=avg, avg_5d=None, n=9, n_cracking=2, names=(), market_offhi=market)
 
 
 def test_neocloud_bands() -> None:
+    # no market baseline → absolute off-high thresholds (back-compat)
     assert _neo(-0.16).band == "cracking"
     assert _neo(-0.09).band == "stressed"  # live: bifurcated, avg ~-9%
     assert _neo(-0.03).band == "calm"
     assert Neocloud(None, None, 0, 0, ()).band == "n/a"
+
+
+def test_neocloud_debeta() -> None:
+    # #1: a basket down 16% in a market also down 14% is NOT a Clock-B crack
+    n = _neo(-0.16, market=-0.14)
+    assert round(n.excess_offhi, 2) == -0.02
+    assert n.band == "calm"  # excess only -2pp vs SPY → not idiosyncratic stress
+    # but down 16% while SPY is flat = real idiosyncratic cracking
+    assert _neo(-0.16, market=-0.01).band == "cracking"  # excess -15pp
+    assert _neo(-0.13, market=-0.02).band == "cracking"  # excess -11pp
+    assert _neo(-0.09, market=-0.03).band == "stressed"  # excess -6pp
 
 
 def _labor(sahm: float | None) -> Labor:
@@ -155,6 +192,25 @@ def test_labor_sahm_bands() -> None:
     assert _labor(0.30).band == "softening"
     assert _labor(0.55).band == "recession signal"  # Sahm triggered
     assert _labor(None).band == "firm"  # no signal → not flagged
+
+
+def test_makers_excess() -> None:
+    m = Makers(avg_offhi=-0.10, avg_5d=None, n=7, names=(), market_offhi=-0.06)
+    assert round(m.excess_offhi, 2) == -0.04  # 4pp worse than SPY
+    assert Makers(-0.10, None, 7, (), None).excess_offhi is None  # no baseline → no excess
+
+
+def test_regime_verdict_weighting() -> None:
+    full = 6.0  # weight sum when all six signals are available
+    assert _verdict(0.0, full) == "risk-on"
+    # #2: the rate/vol trio alone (0.5*3 = 1.5 → 0.25) must NOT reach defensive
+    assert _verdict(1.5, full) == "neutral"
+    assert _verdict(2.0, full) == "neutral"  # credit alone (2.0 → 0.33)
+    assert _verdict(3.5, full) == "defensive"  # credit + conditions (3.5 → 0.58)
+    assert _verdict(0.0, 0) == "no data"
+    # the correlated trio cannot outvote the two independent macro signals
+    trio = sum(_SIGNAL_WEIGHTS[k] for k in ("ratevol", "equityvol", "realrates"))
+    assert trio < _SIGNAL_WEIGHTS["credit"] + _SIGNAL_WEIGHTS["conditions"]
 
 
 def test_mtok_pricing_conversion() -> None:
