@@ -71,6 +71,11 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         si = f"{f.sofr_iorb * 100:+.0f}bp" if f.sofr_iorb is not None else "—"
         return f"SOFR-IORB {si}, RRP ${f.rrp:,.0f}B [{f.band}]" if f.sofr is not None else "n/a"
 
+    def privcred() -> str:
+        pc = macro.private_credit()
+        inf = f"{pc.infra_offhi:+.0%}" if pc.infra_offhi is not None else "—"
+        return f"PC {pc.pc_offhi:+.0%}, infra-debt {inf} [{pc.band}]" if pc.pc_n else "n/a"
+
     def ai() -> str:
         d = ai_demand.ai_demand()
         return f"{d.model_count} models, frontier ${d.frontier_cheapest:.2f}/Mtok" if d else "n/a"
@@ -106,6 +111,7 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         ("crypto-credit (STRC/MSTR)", crypto),
         ("credit stress (ladder/edge)", credit),
         ("funding plumbing (repo/RRP)", funding),
+        ("private credit (BDC/infra)", privcred),
         ("Wikipedia — SPX list", spx),
         ("SEC EDGAR — resolve", edgar_resolve),
         ("X syndication — fetch", xpost),

@@ -378,6 +378,23 @@ def _credit_stress_block(c: macro.CreditStress) -> list[str]:
     return out
 
 
+def _private_credit_block(pc: macro.PrivateCredit) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    def worst(w: tuple[str, float] | None) -> str:
+        return f"worst {w[0]} {w[1]:+.0%}" if w else ""
+
+    return [
+        f"  private credit : {p(pc.pc_offhi)} off-hi ({p(pc.pc_5d)}/5d, n={pc.pc_n})  "
+        f"{worst(pc.pc_worst)}  — BDCs + Ares/Blue Owl",
+        f"  AI-infra debt  : {p(pc.infra_offhi)} off-hi ({p(pc.infra_5d)}/5d, n={pc.infra_n})  "
+        f"{worst(pc.infra_worst)}  — neocloud/datacenter (CRWV/ORCL/VRT)",
+        f"  read: [{pc.band}] equity proxy for the shadow-bank/AI-infra-debt bomb (CDS/CLO/NAV "
+        "are paywalled). Confirms credit_stress; not a standalone trigger.",
+    ]
+
+
 def _funding_stress_block(f: macro.FundingStress) -> list[str]:
     si = f"{f.sofr_iorb * 100:+.0f}bp" if f.sofr_iorb is not None else "—"
     sofr = f"{f.sofr:.2f}%" if f.sofr is not None else "—"
@@ -714,6 +731,7 @@ def build_brief(
     cta = macro.cta()
     cc = macro.crypto_credit()
     creds = macro.credit_stress()
+    privc = macro.private_credit()
     funding = macro.funding_stress()
     mem = macro.memory_prices()
     memtape = macro.memory_tape()
@@ -774,6 +792,10 @@ def build_brief(
         "## Credit stress (Clock B — quality ladder + levered edge)",
         "```",
         *_credit_stress_block(creds),
+        "```",
+        "## Private credit (Clock B — shadow-bank / AI-infra-debt edge)",
+        "```",
+        *_private_credit_block(privc),
         "```",
         "## Funding plumbing (Clock B — repo / liquidity)",
         "```",

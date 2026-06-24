@@ -17,6 +17,7 @@ from degen.macro import (
     CryptoCredit,
     Distribution,
     FundingStress,
+    PrivateCredit,
     RoiCoverage,
 )
 
@@ -114,6 +115,19 @@ def test_funding_stress_bands() -> None:
     assert _funding(-0.04, 6.5).band == "buffer drained"  # live: RRP gone, no repo stress
     assert _funding(0.08, 6.5).band == "repo stress"  # SOFR firmly over IORB
     assert _funding(-0.04, 400.0).band == "ample"  # buffer intact, repo calm
+
+
+def _pc(pc_off: float, infra_off: float) -> PrivateCredit:
+    return PrivateCredit(
+        pc_offhi=pc_off, pc_5d=None, pc_n=7, pc_worst=("OWL", pc_off),
+        infra_offhi=infra_off, infra_5d=None, infra_n=4, infra_worst=("ORCL", infra_off),
+    )
+
+
+def test_private_credit_bands() -> None:
+    assert _pc(-0.09, -0.19).band == "cracking"  # live: infra-debt edge cracking
+    assert _pc(-0.09, -0.04).band == "stressed"  # PC complex stressed, infra ok
+    assert _pc(-0.03, -0.02).band == "calm"
 
 
 def test_mtok_pricing_conversion() -> None:

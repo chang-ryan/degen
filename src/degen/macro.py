@@ -1018,6 +1018,77 @@ def funding_stress() -> FundingStress:
     )
 
 
+# ---------- private credit (Clock B — the on-thesis shadow-bank / AI-infra-debt edge) ----------
+# The free *approximation* of the bomb the thesis keeps naming: the cleanest signals
+# (CDS, CLO spreads, BDC NAV discounts) are paywalled, so we proxy with equities.
+# Two baskets: (1) the private-credit complex — direct-lending BDCs + the PC-heavy
+# alt managers (Ares/Blue Owl); rolling off-highs ≈ discounts widening. (2) the
+# AI-infra-debt edge — neoclouds + debt-funded datacenter builds (CRWV/ORCL/VRT).
+# Equity-noisy, so read it as confirmation of the spread/funding leaks, not alone.
+
+_PC_COMPLEX = ("ARCC", "BXSL", "FSK", "BIZD", "OBDC", "ARES", "OWL")  # BDCs + PC sponsors
+_INFRA_DEBT = ("CRWV", "ORCL", "VRT", "NBIS")  # neocloud / debt-funded datacenter build
+
+
+@dataclass(frozen=True, slots=True)
+class PrivateCredit:
+    pc_offhi: float | None  # avg off-63d-high, private-credit complex
+    pc_5d: float | None
+    pc_n: int
+    pc_worst: tuple[str, float] | None  # most-stressed single name (ticker, off-hi)
+    infra_offhi: float | None  # avg off-high, AI-infra-debt edge
+    infra_5d: float | None
+    infra_n: int
+    infra_worst: tuple[str, float] | None
+
+    @property
+    def band(self) -> str:
+        vals = [v for v in (self.pc_offhi, self.infra_offhi) if v is not None]
+        worst = min(vals) if vals else 0.0
+        if worst <= -0.15:
+            return "cracking"
+        if worst <= -0.07:
+            return "stressed"
+        return "calm"
+
+
+def _basket_stress(
+    tickers: tuple[str, ...],
+) -> tuple[float | None, float | None, int, tuple[str, float] | None]:
+    """(avg off-63d-high, avg 5d, n resolved, worst (ticker, off-hi)) for a basket."""
+    offs: list[tuple[str, float]] = []
+    d5s: list[float] = []
+    for t in tickers:
+        try:
+            s = _close(t, "6mo").dropna()
+            offs.append((t, float(s.iloc[-1] / s.tail(63).max() - 1)))
+            if len(s) > 5:
+                d5s.append(float(s.iloc[-1] / s.iloc[-6] - 1))
+        except Exception:
+            continue
+    if not offs:
+        return None, None, 0, None
+    avg_off = sum(o for _, o in offs) / len(offs)
+    avg_5d = (sum(d5s) / len(d5s)) if d5s else None
+    return avg_off, avg_5d, len(offs), min(offs, key=lambda x: x[1])
+
+
+def private_credit() -> PrivateCredit:
+    """The shadow-bank / AI-infra-debt edge (equity proxy — free approximation)."""
+    pc_off, pc_5d, pc_n, pc_worst = _basket_stress(_PC_COMPLEX)
+    inf_off, inf_5d, inf_n, inf_worst = _basket_stress(_INFRA_DEBT)
+    return PrivateCredit(
+        pc_offhi=pc_off,
+        pc_5d=pc_5d,
+        pc_n=pc_n,
+        pc_worst=pc_worst,
+        infra_offhi=inf_off,
+        infra_5d=inf_5d,
+        infra_n=inf_n,
+        infra_worst=inf_worst,
+    )
+
+
 # ---------- consumer health (the demand base that ultimately funds AI) ----------
 # Almost every AI-funding dollar traces back to the consumer (ad rev, retail) or to
 # capital markets (the untethered, fragile part). This panel instruments the consumer
