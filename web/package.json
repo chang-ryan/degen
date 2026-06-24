@@ -1,0 +1,26 @@
+{
+  "name": "degen-dashboard",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "seed": "node scripts/seed.mjs",
+    "dev": "node --no-warnings node_modules/nuxt/bin/nuxt.mjs dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "nuxt": "^4.4.8",
+    "vue": "^3.5.38"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^9.0.0",
+    "@nuxt/eslint": "^1.16.0",
+    "@tailwindcss/vite": "^4.3.1",
+    "eslint": "^10.5.0",
+    "tailwindcss": "^4.3.1"
+  }
+}

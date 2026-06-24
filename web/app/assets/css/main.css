@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/* Tailwind v4 is CSS-first: the theme lives here, not in a tailwind.config.js. */
+@theme {
+  --color-ink-950: #0a0c10;
+  --color-ink-900: #0f1218;
+  --color-ink-850: #141822;
+  --color-ink-800: #1a1f2b;
+  --color-ink-700: #252b3a;
+  --color-good: #2dd4a7;
+  --color-warn: #f5b942;
+  --color-bad: #f0556b;
+  --color-muted: #7c8699;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #0a0c10;
+  color: #e6e9ef;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-ink-700/70 bg-ink-850 p-4;
+  }
+  .card-good {
+    @apply border-l-2 border-l-good;
+  }
+  .card-warn {
+    @apply border-l-2 border-l-warn;
+  }
+  .card-bad {
+    @apply border-l-2 border-l-bad;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
+  }
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted;
+  }
+}
+
+/* thin scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #252b3a;
+  border-radius: 8px;
+}
