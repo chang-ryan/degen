@@ -20,6 +20,7 @@ from degen.macro import (
     FundingStress,
     Labor,
     Makers,
+    MemoryTape,
     Neocloud,
     PrivateCredit,
     RoiCoverage,
@@ -211,6 +212,39 @@ def test_regime_verdict_weighting() -> None:
     # the correlated trio cannot outvote the two independent macro signals
     trio = sum(_SIGNAL_WEIGHTS[k] for k in ("ratevol", "equityvol", "realrates"))
     assert trio < _SIGNAL_WEIGHTS["credit"] + _SIGNAL_WEIGHTS["conditions"]
+
+
+# ---- single-source contract: .states (dashboard row colors) share .band's cutoffs ----
+
+
+def test_credit_stress_states_single_source() -> None:
+    # leaking: IG calm, CCC always flagged, BDC breached, banks fine
+    s = _credit(0.74, 9.47, -0.079, 0.0).states
+    assert s == {"ig": "good", "ccc": "bad", "bdc": "bad", "banks": None}
+    assert _credit(1.20, 9.47, -0.02, 0.0).states["ig"] == "bad"  # IG systemic
+    assert _credit(0.74, 5.0, -0.02, -0.10).states["banks"] == "bad"  # banks broke
+    # de-beta flows into the row state: BDC -8% but market -6% → excess -2% → not a leak
+    assert _credit(0.74, 5.0, -0.08, 0.0, market=-0.06).states["bdc"] == "warn"
+
+
+def test_private_credit_states() -> None:
+    assert _pc(-0.09, -0.19).states == {"pc": "warn", "infra": "bad"}
+    assert _pc(-0.03, -0.02).states == {"pc": "good", "infra": "good"}
+
+
+def test_neocloud_name_state_and_severity() -> None:
+    n = _neo(-0.16)  # no market baseline → absolute cutoffs
+    assert n.severity == "bad" and n.band == "cracking"
+    assert n.name_state(-0.16) == "bad"
+    assert n.name_state(-0.10) == "warn"
+    assert n.name_state(-0.02) == "good"
+    assert n.name_state(None) is None
+
+
+def test_scope_labels_present() -> None:
+    # every relabeled/claim-bearing gauge carries the canonical claim both render paths read
+    for cls in (CreditStress, PrivateCredit, Neocloud, Makers, Labor, MemoryTape):
+        assert isinstance(cls.SCOPE, str) and len(cls.SCOPE) > 20
 
 
 def test_mtok_pricing_conversion() -> None:

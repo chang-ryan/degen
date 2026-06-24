@@ -49,6 +49,7 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import ClassVar
 
 import pandas as pd
 import yfinance as yf
@@ -67,6 +68,29 @@ _BROWSER_HEADERS = {
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={}"
 FRED_TIMEOUT = 10  # seconds; urllib has no default timeout and will hang on a stalled socket
 PCTILE_WINDOW = 252  # ~1y trading days; matches the IV-rank convention
+
+
+# ---------- shared severity classification (single source: bands + dashboard rows) ----------
+# A gauge's `.band` cutoffs and the dashboard's per-row dot colors MUST use the same
+# numbers — when a threshold changes (e.g. the de-beta), a second hardcoded copy in
+# webexport silently de-syncs and mis-colors. So the cutoffs live here once; `.band`
+# and `.states` both read them, and webexport reads `.states`/`.SCOPE` instead of
+# re-deriving. Tokens are *severity* ("bad"/"warn"/"good"), NOT colors — webexport
+# maps them to CSS, daily renders ASCII; presentation stays per render path.
+BASKET_CRACK_EX, BASKET_STRESS_EX = -0.10, -0.05  # basket off-high vs SPY (de-beta'd excess)
+BASKET_CRACK_ABS, BASKET_STRESS_ABS = -0.15, -0.07  # absolute fallback / per-name rows
+_BAND_OF_SEV = {"bad": "cracking", "warn": "stressed", "good": "calm"}  # basket band text
+
+
+def _sev(value: float | None, crack: float, stress: float) -> str | None:
+    """Severity for a 'more-negative = worse' metric: bad <= crack < warn <= stress < good."""
+    if value is None:
+        return None
+    if value <= crack:
+        return "bad"
+    if value <= stress:
+        return "warn"
+    return "good"
 
 
 @dataclass(frozen=True, slots=True)
@@ -704,6 +728,11 @@ class MemoryTape:
     d21: float | None  # 21d change
     off_hi: float | None  # off its 63d high (the unwind-so-far)
 
+    SCOPE: ClassVar[str] = (
+        "broad Korea/memory tilt (EWY) — a Korea-beta & Asia-risk canary, NOT the memory "
+        "duopoly; direct makers live in the maker panel."
+    )
+
 
 def memory_tape() -> MemoryTape:
     """Korea-beta canary via EWY (broad Korea, memory tilt — direct makers in makers())."""
@@ -746,6 +775,12 @@ class Makers:
     n: int
     names: tuple[tuple[str, float, float | None], ...]  # (ticker, off-hi, 5d), worst-first
     market_offhi: float | None = None  # SPY off-63d-high — for the de-beta'd excess (#1)
+
+    SCOPE: ClassVar[str] = (
+        "semicap/memory supply oligopoly (Samsung/Hynix/TSMC/ASML/Infineon/MU) — EQUITY-BETA "
+        "health (de-beta'd vs SPY), NOT supply tightness; can't see CoWoS lead times / HBM "
+        "allocation (no free feed)."
+    )
 
     @property
     def excess_offhi(self) -> float | None:
@@ -974,6 +1009,11 @@ _CREDIT_LADDER = {
     "ccc": ("BAMLH0A3HYC", 21),  # CCC & lower — the marginal borrower, cracks first
 }
 _LEVERED_EDGE = ("BIZD", "BKLN", "KRE")  # private-credit/BDC · leveraged loans · regional banks
+# Band cutoffs — single source for .band AND the dashboard's per-row colors (.states).
+_IG_SYSTEMIC = 1.0  # IG OAS above this (%) = stress reached quality = systemic
+_BDC_LEAK = -0.05  # BDC excess off-hi below this = private-credit leak (bottom edge)
+_BANKS_BREAK = -0.08  # KRE excess off-hi below this = banking-system stress = systemic
+_DISP_WIDE = 7.0  # CCC-IG dispersion above this (pp) = bottom tier cracking
 
 
 @dataclass(frozen=True, slots=True)
@@ -990,6 +1030,12 @@ class CreditStress:
     banks_offhi: float | None  # KRE (regional banks)
     stale: tuple[str, ...]
     market_offhi: float | None = None  # SPY off-63d-high — netted out of the equity edges (#1)
+
+    SCOPE: ClassVar[str] = (
+        "corporate quality ladder (IG→CCC, FRED) + the levered/shadow-bank edge (de-beta'd). "
+        "CCC + private credit cracking while IG/banks calm = early/confined; IG widening or "
+        "banks breaking = systemic."
+    )
 
     @property
     def dispersion(self) -> float | None:
@@ -1009,15 +1055,27 @@ class CreditStress:
     def band(self) -> str:
         banks_ex, bdc_ex = self._excess(self.banks_offhi), self._excess(self.bdc_offhi)
         # systemic: stress reached quality (IG, spread-based) or the banks (KRE, de-beta'd)
-        if (self.ig_oas is not None and self.ig_oas > 1.0) or (
-            banks_ex is not None and banks_ex < -0.08
+        if (self.ig_oas is not None and self.ig_oas > _IG_SYSTEMIC) or (
+            banks_ex is not None and banks_ex < _BANKS_BREAK
         ):
             return "spreading (quality/banks)"
         # bottom-edge leak: private credit (de-beta'd) or the CCC tier while the top is calm
         disp = self.dispersion
-        if (bdc_ex is not None and bdc_ex < -0.05) or (disp is not None and disp > 7):
+        if (bdc_ex is not None and bdc_ex < _BDC_LEAK) or (disp is not None and disp > _DISP_WIDE):
             return "leaking (bottom edge)"
         return "calm"
+
+    @property
+    def states(self) -> dict[str, str | None]:
+        """Per-row severity for the dashboard — SAME cutoffs the band uses (incl. de-beta)."""
+        bdc_ex, banks_ex = self._excess(self.bdc_offhi), self._excess(self.banks_offhi)
+        ig = None if self.ig_oas is None else ("bad" if self.ig_oas > _IG_SYSTEMIC else "good")
+        return {
+            "ig": ig,
+            "ccc": None if self.ccc_oas is None else "bad",
+            "bdc": None if bdc_ex is None else ("bad" if bdc_ex < _BDC_LEAK else "warn"),
+            "banks": None if banks_ex is None else ("bad" if banks_ex < _BANKS_BREAK else None),
+        }
 
 
 def credit_stress() -> CreditStress:
@@ -1153,6 +1211,12 @@ class PrivateCredit:
     infra_worst: tuple[str, float] | None
     market_offhi: float | None = None  # SPY off-63d-high — for the de-beta'd excess (#1)
 
+    SCOPE: ClassVar[str] = (
+        "de-beta'd equity proxy for the shadow-bank / AI-infra-debt edge (CDS/CLO/NAV are "
+        "paywalled). Infra basket (ORCL/VRT/DLR) is tech-multiple beta, NOT debt stress. "
+        "Confirms credit_stress/funding; never a standalone trigger."
+    )
+
     @property
     def pc_excess(self) -> float | None:
         if self.pc_offhi is None or self.market_offhi is None:
@@ -1166,19 +1230,25 @@ class PrivateCredit:
         return self.infra_offhi - self.market_offhi
 
     @property
-    def band(self) -> str:
-        # prefer the de-beta'd excess; fall back to absolute off-high if no SPY baseline
+    def severity(self) -> str | None:
+        """bad/warn/good for the worst basket — de-beta'd excess if available, else absolute."""
         ex = [v for v in (self.pc_excess, self.infra_excess) if v is not None]
         if ex:
-            worst, crack, stress = min(ex), -0.10, -0.05
-        else:
-            raw = [v for v in (self.pc_offhi, self.infra_offhi) if v is not None]
-            worst, crack, stress = (min(raw) if raw else 0.0), -0.15, -0.07
-        if worst <= crack:
-            return "cracking"
-        if worst <= stress:
-            return "stressed"
-        return "calm"
+            return _sev(min(ex), BASKET_CRACK_EX, BASKET_STRESS_EX)
+        raw = [v for v in (self.pc_offhi, self.infra_offhi) if v is not None]
+        return _sev(min(raw), BASKET_CRACK_ABS, BASKET_STRESS_ABS) if raw else "good"
+
+    @property
+    def band(self) -> str:
+        return _BAND_OF_SEV.get(self.severity, "calm")
+
+    @property
+    def states(self) -> dict[str, str | None]:
+        """Per-row severity for the dashboard (raw off-hi, absolute cutoffs) — single-sourced."""
+        return {
+            "pc": _sev(self.pc_offhi, BASKET_CRACK_ABS, BASKET_STRESS_ABS),
+            "infra": _sev(self.infra_offhi, BASKET_CRACK_ABS, BASKET_STRESS_ABS),
+        }
 
 
 def _basket_stress(
@@ -1247,6 +1317,11 @@ class Neocloud:
     names: tuple[tuple[str, float, float | None], ...]  # (ticker, off-hi, 5d), worst-first
     market_offhi: float | None = None  # SPY off-63d-high — netted out for the band (#1)
 
+    SCOPE: ClassVar[str] = (
+        "levered GPU-cloud operators (CRWV/IREN/…) — the sharpest, most faith-dependent "
+        "Clock-B edge; cracks first. De-beta'd vs SPY. Bifurcation = name-specific."
+    )
+
     @property
     def excess_offhi(self) -> float | None:
         """Basket drawdown beyond the market's — the idiosyncratic Clock-B stress."""
@@ -1255,18 +1330,20 @@ class Neocloud:
         return self.avg_offhi - self.market_offhi
 
     @property
-    def band(self) -> str:
-        # prefer the de-beta'd excess; tighter thresholds than the absolute fallback
+    def severity(self) -> str | None:
+        """bad/warn/good for the basket — de-beta'd excess if available, else absolute."""
         ex = self.excess_offhi
-        v = ex if ex is not None else self.avg_offhi
-        if v is None:
-            return "n/a"
-        crack, stress = (-0.10, -0.05) if ex is not None else (-0.15, -0.07)
-        if v <= crack:
-            return "cracking"
-        if v <= stress:
-            return "stressed"
-        return "calm"
+        if ex is not None:
+            return _sev(ex, BASKET_CRACK_EX, BASKET_STRESS_EX)
+        return _sev(self.avg_offhi, BASKET_CRACK_ABS, BASKET_STRESS_ABS)
+
+    @property
+    def band(self) -> str:
+        return _BAND_OF_SEV.get(self.severity, "n/a")
+
+    def name_state(self, off: float | None) -> str | None:
+        """Per-name row severity (raw off-hi, absolute cutoffs) — for the dashboard table."""
+        return _sev(off, BASKET_CRACK_ABS, BASKET_STRESS_ABS)
 
 
 def neocloud() -> Neocloud:
@@ -1499,6 +1576,11 @@ class Labor:
     tech_yoy: float | None  # IT-services employment YoY (substitution *hint*, not proof)
     continued_claims: float | None  # level
     stale: tuple[str, ...]
+
+    SCOPE: ClassVar[str] = (
+        "jobs = the consumer income engine (Clock A); Sahm rule = the recession trigger. Tech "
+        "line is IT-services employment (CES6054150001) — a substitution *hint*, not proof."
+    )
 
     @property
     def band(self) -> str:
