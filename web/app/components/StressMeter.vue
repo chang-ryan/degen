@@ -1,5 +1,10 @@
 <script setup lang="ts">
-defineProps<{ panel: any }>()
+const props = defineProps<{ panel: any }>()
+// Derive the meter from the actual signal rows so the red segments + the "N/6"
+// count can never disagree with the green/red dots below them.
+const rows = computed(() => props.panel.rows ?? [])
+const available = computed(() => props.panel.extra?.available ?? rows.value.length)
+const stress = computed(() => rows.value.filter((r: any) => r.state === 'bad').length)
 </script>
 
 <template>
@@ -14,14 +19,14 @@ defineProps<{ panel: any }>()
     <!-- stress segments -->
     <div class="flex items-end gap-2">
       <div class="text-3xl font-bold text-slate-100">
-        {{ panel.extra.stress }}<span class="text-base text-muted">/{{ panel.extra.available }}</span>
+        {{ stress }}<span class="text-base text-muted">/{{ available }}</span>
       </div>
       <div class="mb-1.5 flex flex-1 gap-1">
         <span
-          v-for="i in panel.extra.available"
+          v-for="i in available"
           :key="i"
           class="h-2 flex-1 rounded-sm"
-          :class="i <= panel.extra.stress ? 'bg-bad' : 'bg-good/60'"
+          :class="i <= stress ? 'bg-bad' : 'bg-good/60'"
         />
       </div>
     </div>
