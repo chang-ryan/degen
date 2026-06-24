@@ -33,6 +33,13 @@ T = TypeVar("T")
 
 DB_PATH = Path(__file__).resolve().parents[2] / "web" / "data" / "briefs.db"
 
+# Placeholder synopsis. The real memo is hand/LLM-authored and attached by a separate
+# publish step — so webexport must PRESERVE an existing non-stub synopsis, never clobber it.
+_SYNOPSIS_STUB = (
+    "_Auto-generated gauge snapshot — synopsis is authored separately "
+    "(privacy-scanned) and attached via the publish-synopsis step._"
+)
+
 
 # ---------- small formatting guards (mirror daily.py conventions) ----------
 
@@ -914,10 +921,7 @@ def build_payload(when: date | None = None) -> dict[str, Any]:
         "date": when.isoformat(),
         "regimeLabel": regime.verdict if regime else "n/a",
         "posture": _posture(momo, cc, cta),
-        "synopsis": (
-            "_Auto-generated gauge snapshot — synopsis is authored separately "
-            "(privacy-scanned) and attached via the publish-synopsis step._"
-        ),
+        "synopsis": _SYNOPSIS_STUB,
         "what_changed": what_changed,
         "groups": groups,
     }
@@ -977,12 +981,43 @@ def _backfill_from_sqlite() -> None:
         print(f"  {d}: {_push_supabase(json.loads(payload_str))}")
 
 
+def _existing_synopsis(date_str: str) -> str | None:
+    """The synopsis already stored for `date_str` (Supabase if configured, else SQLite)."""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
+    if url and key:
+        try:
+            req = urllib.request.Request(
+                f"{url}/rest/v1/briefs?select=payload&date=eq.{date_str}",
+                headers={"apikey": key},
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                rows = json.loads(r.read())
+            return rows[0]["payload"].get("synopsis") if rows else None
+        except Exception:
+            return None
+    if not DB_PATH.exists():
+        return None
+    try:
+        con = sqlite3.connect(DB_PATH)
+        row = con.execute("SELECT payload FROM briefs WHERE date = ?", (date_str,)).fetchone()
+        con.close()
+        return json.loads(row[0]).get("synopsis") if row else None
+    except Exception:
+        return None
+
+
 def main() -> None:
     if "backfill" in sys.argv[1:]:
         _backfill_from_sqlite()
         return
     load_dotenv()
     payload = build_payload()
+    # never clobber a hand-curated synopsis: keep any existing non-stub memo.
+    existing = _existing_synopsis(payload["date"])
+    if existing and existing.strip() and existing.strip() != _SYNOPSIS_STUB.strip():
+        payload["synopsis"] = existing
+        print("  · preserved existing curated synopsis (not overwriting)", flush=True)
     _write(payload)
     n = sum(len(v) for v in payload["groups"].values())
     print(
