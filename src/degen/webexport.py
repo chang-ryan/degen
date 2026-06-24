@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import sys
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -962,7 +963,24 @@ def _push_supabase(payload: dict[str, Any]) -> str:
         return f"failed: {e}"
 
 
+def _backfill_from_sqlite() -> None:
+    """Push every row already in the local SQLite DB up to Supabase (idempotent upsert)."""
+    load_dotenv()
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute("SELECT date, payload FROM briefs ORDER BY date").fetchall()
+    con.close()
+    if not rows:
+        print(f"no rows in {DB_PATH} to backfill")
+        return
+    print(f"backfilling {len(rows)} row(s) from {DB_PATH} → Supabase…")
+    for d, payload_str in rows:
+        print(f"  {d}: {_push_supabase(json.loads(payload_str))}")
+
+
 def main() -> None:
+    if "backfill" in sys.argv[1:]:
+        _backfill_from_sqlite()
+        return
     load_dotenv()
     payload = build_payload()
     _write(payload)
