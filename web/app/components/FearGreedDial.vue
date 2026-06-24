@@ -2,35 +2,34 @@
 const props = defineProps<{ panel: any }>()
 const score = computed(() => Math.max(0, Math.min(100, props.panel.extra.score)))
 
-// semicircle gauge: 180deg sweep, score 0..100 -> angle -90..+90
+// Standard speedometer: 0 = extreme fear (LEFT) → 100 = extreme greed (RIGHT),
+// arc over the top, flat side down. The needle + fill sit low-left for fear.
 const R = 70
 const CX = 90
-const CY = 90
-function pt(angleDeg: number) {
-  const a = ((angleDeg - 90) * Math.PI) / 180
-  return [CX + R * Math.cos(a), CY + R * Math.sin(a)]
+const CY = 80 // baseline; the semicircle bulges up (y < CY)
+
+// score 0..100 → a point on the upper semicircle (180° on the left → 0° on the right).
+function pt(s: number): [number, number] {
+  const rad = ((180 - (s / 100) * 180) * Math.PI) / 180
+  return [CX + R * Math.cos(rad), CY - R * Math.sin(rad)]
 }
-const arc = computed(() => {
-  const a0 = 0
-  const a1 = (score.value / 100) * 180
-  const [x0, y0] = pt(a0)
-  const [x1, y1] = pt(a1)
-  const large = a1 - a0 > 180 ? 1 : 0
-  return `M ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1}`
-})
-const trackPath = computed(() => {
-  const [x0, y0] = pt(0)
-  const [x1, y1] = pt(180)
-  return `M ${x0} ${y0} A ${R} ${R} 0 1 1 ${x1} ${y1}`
-})
+// top-semicircle arc from score s0 → s1 (s0 ≤ s1); sweep=1 draws over the top
+function arcPath(s0: number, s1: number): string {
+  const [x0, y0] = pt(s0)
+  const [x1, y1] = pt(s1)
+  return `M ${x0} ${y0} A ${R} ${R} 0 0 1 ${x1} ${y1}`
+}
+
+const trackPath = computed(() => arcPath(0, 100))
+const valuePath = computed(() => arcPath(0, score.value))
+const needle = computed(() => pt(score.value))
 const color = computed(() =>
-  score.value < 25 ? '#f0556b' : score.value < 45 ? '#f5b942' : score.value < 55 ? '#7c8699' : score.value < 75 ? '#2dd4a7' : '#2dd4a7',
+  score.value < 25 ? '#f0556b' : score.value < 45 ? '#f5b942' : score.value < 55 ? '#7c8699' : '#2dd4a7',
 )
-const needle = computed(() => pt((score.value / 100) * 180))
 </script>
 
 <template>
-  <div class="card flex flex-col gap-2">
+  <div class="card flex flex-col gap-3">
     <div class="flex items-start justify-between">
       <h3 class="text-sm font-semibold text-slate-200">
         {{ panel.title }}
@@ -38,24 +37,28 @@ const needle = computed(() => pt((score.value / 100) * 180))
       <span class="chip bg-ink-800 text-muted">contrarian</span>
     </div>
 
-    <div class="relative mx-auto">
-      <svg viewBox="0 5 180 95" class="w-[200px]">
-        <path :d="trackPath" fill="none" stroke="#252b3a" stroke-width="10" stroke-linecap="round" />
-        <path :d="arc" fill="none" :stroke="color" stroke-width="10" stroke-linecap="round" />
-        <line :x1="CX" :y1="CY" :x2="needle[0]" :y2="needle[1]" :stroke="color" stroke-width="2" />
-        <circle :cx="CX" :cy="CY" r="4" :fill="color" />
-      </svg>
-      <div class="absolute inset-x-0 bottom-0 text-center">
-        <div class="text-3xl font-bold" :style="{ color }">
-          {{ Math.round(score) }}
-        </div>
-        <div class="text-[11px] uppercase tracking-wide text-muted">
-          {{ panel.headline.label }}
-        </div>
+    <!-- gauge -->
+    <svg viewBox="6 0 168 96" class="mx-auto w-[220px]">
+      <path :d="trackPath" fill="none" stroke="#252b3a" stroke-width="11" stroke-linecap="round" />
+      <path :d="valuePath" fill="none" :stroke="color" stroke-width="11" stroke-linecap="round" />
+      <line :x1="CX" :y1="CY" :x2="needle[0]" :y2="needle[1]" :stroke="color" stroke-width="2.5" />
+      <circle :cx="CX" :cy="CY" r="4.5" :fill="color" />
+      <text x="16" y="94" fill="#5b6577" font-size="9">fear</text>
+      <text x="146" y="94" fill="#5b6577" font-size="9">greed</text>
+    </svg>
+
+    <!-- value text, BELOW the gauge -->
+    <div class="text-center leading-none">
+      <div class="text-3xl font-bold" :style="{ color }">
+        {{ Math.round(score) }}
+      </div>
+      <div class="mt-1 text-[11px] uppercase tracking-wide text-muted">
+        {{ panel.headline.label }}
       </div>
     </div>
 
-    <div class="mt-1 flex flex-wrap gap-1">
+    <!-- sub-index badges, BELOW the text -->
+    <div class="flex flex-wrap justify-center gap-1">
       <span
         v-for="(s, i) in panel.extra.subs"
         :key="i"
