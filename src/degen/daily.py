@@ -556,7 +556,14 @@ def _memory_block(
         latest = m.latest or {}
         d = f"DRAM {latest['dram_qoq_pct']:+.0f}%" if latest.get("dram_qoq_pct") is not None else ""
         n = f"NAND {latest['nand_qoq_pct']:+.0f}%" if latest.get("nand_qoq_pct") is not None else ""
-        out.append(f"  latest print   : {latest.get('asof')} {d} {n} ({latest.get('source')})")
+        if d or n:  # explicit contract-price ASP print
+            out.append(f"  latest print   : {latest.get('asof')} {d} {n} ({latest.get('source')})")
+        else:  # realized read (release confirms; ASP % still in the call slides)
+            rq = f"rev {latest['rev_qoq_pct']:+.0f}% QoQ" if latest.get("rev_qoq_pct") else ""
+            out.append(
+                f"  latest print   : {latest.get('asof')} {latest.get('verdict', 'printed')}"
+                f"  {rq} ({latest.get('source')}); explicit ASP % in call slides"
+            )
     out.append(
         "  read: prints > consensus = super-cycle real (tops ~2028; trim=sizing not "
         "timing) · < consensus = top sooner."

@@ -691,9 +691,13 @@ def memory_prices() -> MemoryPrices | None:
         fc = cfg.get("forecast", {})
         obs = cfg.get("observed", [])
 
+        # A print counts once it lands: an explicit DRAM/NAND contract-price QoQ, OR a
+        # realized read (revenue QoQ / verdict) when the release confirms the cycle but
+        # the ASP % is still only in the call slides.
+        _print_keys = ("dram_qoq_pct", "nand_qoq_pct", "rev_qoq_pct", "verdict")
         latest = None
         for o in reversed(obs):
-            if o.get("dram_qoq_pct") is not None or o.get("nand_qoq_pct") is not None:
+            if any(o.get(k) is not None for k in _print_keys):
                 latest = o
                 break
 
