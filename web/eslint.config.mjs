@@ -19,6 +19,9 @@ export default withNuxt(
       'ts/no-explicit-any': 'off',
       // the live exporter and seed log progress to stdout
       'no-console': 'off',
+      // Nitro/unenv provides `process` as a global in server code; importing
+      // 'node:process' duplicates the declaration and crashes the Vercel runtime.
+      'node/prefer-global/process': 'off',
     },
   },
 )
