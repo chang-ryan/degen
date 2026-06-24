@@ -655,6 +655,164 @@ def memory_prices() -> MemoryPrices | None:
         return None
 
 
+# ---------- memory maker tape (live proxy for the contract-price gauge) ----------
+# memory_prices() is hand-entered and lags (contract prints come quarterly). EWY
+# (iShares MSCI South Korea) is ~25% Samsung + ~10% SK Hynix — the global memory
+# duopoly — so its tape is a free, daily, *leading* read on the same complex, and
+# doubles as the Korea/Asia risk canary (KOSPI led the early-June momo unwind).
+# Rolling while contract prints stay strong = the equity market front-running a top.
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryTape:
+    ewy: float | None  # EWY level
+    d1: float | None  # 1d change
+    d5: float | None  # 5d change
+    d21: float | None  # 21d change
+    off_hi: float | None  # off its 63d high (the unwind-so-far)
+
+
+def memory_tape() -> MemoryTape:
+    """Live memory-duopoly tape via EWY (Samsung/SK Hynix proxy) — leads the prints."""
+    try:
+        s = _close("EWY", "6mo").dropna()
+        return MemoryTape(
+            ewy=float(s.iloc[-1]),
+            d1=float(s.iloc[-1] / s.iloc[-2] - 1) if len(s) > 1 else None,
+            d5=float(s.iloc[-1] / s.iloc[-6] - 1) if len(s) > 5 else None,
+            d21=float(s.iloc[-1] / s.iloc[-22] - 1) if len(s) > 21 else None,
+            off_hi=float(s.iloc[-1] / s.tail(63).max() - 1),
+        )
+    except Exception:
+        return MemoryTape(None, None, None, None, None)
+
+
+# ---------- bottleneck makers (the deep-moat supply leaders — supply-side watch) ----------
+# The other side of the AI-infra stack: the oligopoly leaders at the binding
+# constraints (memory HBM, CoWoS packaging, EUV litho, power semis). Deep moats,
+# but "price-maker on margin, price-taker on demand" — leveraged to capex like
+# everything else. Foreign-listed where there's no clean US line (Samsung/Hynix on
+# .KS in local currency; off-high/5d is currency-neutral). `macro makers` = full table.
+_MAKERS = {
+    "MU": "Micron — US memory pure-play (HBM/DRAM/NAND)",
+    "005930.KS": "Samsung — HBM/DRAM/NAND + foundry (KRW)",
+    "000660.KS": "SK Hynix — HBM leader (KRW)",
+    "285A.T": "Kioxia — NAND (JPY)",
+    "TSM": "TSMC — CoWoS packaging + logic foundry",
+    "ASML": "ASML — EUV litho monopoly",
+    "IFNNY": "Infineon — power-semi leader (ADR)",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Makers:
+    avg_offhi: float | None
+    avg_5d: float | None
+    n: int
+    names: tuple[tuple[str, float, float | None], ...]  # (ticker, off-hi, 5d), worst-first
+
+
+def makers() -> Makers:
+    """The deep-moat supply leaders (memory/packaging/litho/power) — supply-side watch."""
+    rows: list[tuple[str, float, float | None]] = []
+    for t in _MAKERS:
+        try:
+            s = _close(t, "6mo").dropna()
+            off = float(s.iloc[-1] / s.tail(63).max() - 1)
+            d5 = float(s.iloc[-1] / s.iloc[-6] - 1) if len(s) > 5 else None
+            rows.append((t, off, d5))
+        except Exception:
+            continue
+    rows.sort(key=lambda r: r[1])
+    offs = [o for _, o, _ in rows]
+    d5s = [d for _, _, d in rows if d is not None]
+    return Makers(
+        avg_offhi=(sum(offs) / len(offs)) if offs else None,
+        avg_5d=(sum(d5s) / len(d5s)) if d5s else None,
+        n=len(rows),
+        names=tuple(rows),
+    )
+
+
+# ---------- AI ROI coverage (the Clock-A numerator) ----------
+# The blind spot: ai_demand() tracks the PRICE side (intelligence commoditizing —
+# the Jevons denominator). This tracks the REVENUE side — lab ARR run-rates vs
+# aggregate hyperscaler capex — the thing that answers "is paid demand catching the
+# spend before credit cracks (Clock B)." Free feeds can't see ARR/capex, so it's
+# hand-entered (roi_coverage.json). The honesty check is exogenous-vs-circular:
+# circular ARR (NVDA->OpenAI->Azure->NVDA, vendor-financed) inflates the numerator
+# without anchoring it in end-customer value. See ai-infra-cycle-top.md (two clocks).
+
+_ROI_FILE = Path("roi_coverage.json")
+
+
+@dataclass(frozen=True, slots=True)
+class RoiCoverage:
+    asof: str | None
+    total_arr: float | None  # $B, sum of lab run-rates
+    capex: float | None  # $B, aggregate annual
+    coverage: float | None  # total_arr / capex
+    exo_coverage: float | None  # exogenous-only coverage (strips circular_pct)
+    circular_pct: float | None  # est. share of ARR that's AI-internal/vendor-financed
+    arr_growth: float | None  # ARR growth vs prior period
+    capex_growth: float | None  # capex growth vs prior period
+    vol_growth: float | None  # token-volume growth (Jevons numerator), optional
+    labs: tuple[tuple[str, float], ...]  # (name, arr_b) for display
+    note: str | None
+
+    @property
+    def closing(self) -> bool | None:
+        """Is the ROI gap narrowing? ARR growing faster than capex = Clock A catching up."""
+        if self.arr_growth is None or self.capex_growth is None:
+            return None
+        return self.arr_growth > self.capex_growth
+
+
+def roi_coverage() -> RoiCoverage | None:
+    """Lab ARR vs aggregate capex — the AI-ROI coverage gauge (hand-entered)."""
+
+    def _growth(latest: float | None, prior: float | None) -> float | None:
+        return (latest / prior - 1) if (latest and prior) else None
+
+    try:
+        cfg = json.loads(_ROI_FILE.read_text())
+        capex = cfg.get("capex", {})
+        labs_raw = cfg.get("labs", [])
+
+        labs = [
+            (str(la.get("name", "?")), float(la["arr_b"])) for la in labs_raw if la.get("arr_b")
+        ]
+        total_arr = sum(a for _, a in labs) or None
+        prior_arr = (
+            sum(float(la["prior_arr_b"]) for la in labs_raw if la.get("prior_arr_b")) or None
+        )
+
+        cap = float(capex["annual_b"]) if capex.get("annual_b") else None
+        prior_cap = float(capex["prior_annual_b"]) if capex.get("prior_annual_b") else None
+
+        circ = cfg.get("circular_pct")
+        circ = float(circ) if circ is not None else None
+        coverage = (total_arr / cap) if (total_arr and cap) else None
+        exo = (total_arr * (1 - circ) / cap) if (total_arr and cap and circ is not None) else None
+
+        vol = cfg.get("token_volume", {})
+        return RoiCoverage(
+            asof=cfg.get("asof"),
+            total_arr=total_arr,
+            capex=cap,
+            coverage=coverage,
+            exo_coverage=exo,
+            circular_pct=circ,
+            arr_growth=_growth(total_arr, prior_arr),
+            capex_growth=_growth(cap, prior_cap),
+            vol_growth=_growth(vol.get("idx"), vol.get("prior_idx")),
+            labs=tuple(labs),
+            note=cfg.get("note"),
+        )
+    except Exception:
+        return None
+
+
 # ---------- crypto / AI-infra credit gauge ----------
 # The MSTR/Strategy capital structure is the leverage node of the BTC-treasury
 # complex and a *dress rehearsal* for AI-infra leverage (leverage against volatile
@@ -746,6 +904,299 @@ def crypto_credit() -> CryptoCredit:
     )
 
 
+# ---------- credit stress (Clock B — the quality ladder + the levered edge) ----------
+# crypto_credit is ONE edge; this is the broad Clock B. The single HY OAS number
+# (in the regime panel) hides where cracks show first: (1) the quality ladder —
+# CCC (the marginal borrower) blows out before IG, so CCC-vs-IG *dispersion* leads
+# the index; (2) the levered/shadow-bank edge — private-credit/BDCs, leveraged
+# loans, regional banks — where this cycle's AI-infra/datacenter leverage sits.
+# Confined to the bottom (CCC + private credit cracking, IG + banks calm) = early.
+# IG widening or banks breaking = stress reaching quality = systemic. FRED + yfinance.
+
+_CREDIT_LADDER = {
+    "ig": ("BAMLC0A0CM", 21),  # investment-grade OAS — the "quality" rung
+    "bb": ("BAMLH0A1HYBB", 21),  # BB (top of junk)
+    "hy": ("BAMLH0A0HYM2", 21),  # broad HY OAS (also the regime credit vote)
+    "ccc": ("BAMLH0A3HYC", 21),  # CCC & lower — the marginal borrower, cracks first
+}
+_LEVERED_EDGE = ("BIZD", "BKLN", "KRE")  # private-credit/BDC · leveraged loans · regional banks
+
+
+@dataclass(frozen=True, slots=True)
+class CreditStress:
+    ig_oas: float | None  # %
+    bb_oas: float | None
+    hy_oas: float | None
+    ccc_oas: float | None
+    ccc_chg: float | None  # CCC change vs ~1mo, pp (rising = bottom cracking)
+    ig_chg: float | None  # IG change vs ~1mo, pp (rising = stress reaching quality)
+    bdc_offhi: float | None  # BIZD off 63d high (private-credit / BDC)
+    bdc_5d: float | None
+    loans_offhi: float | None  # BKLN (leveraged loans)
+    banks_offhi: float | None  # KRE (regional banks)
+    stale: tuple[str, ...]
+
+    @property
+    def dispersion(self) -> float | None:
+        """CCC minus IG (pp). Wide = stress concentrated at the bottom (early crack)."""
+        if self.ccc_oas is None or self.ig_oas is None:
+            return None
+        return self.ccc_oas - self.ig_oas
+
+    @property
+    def band(self) -> str:
+        # systemic: stress reached quality (IG) or the banking system (KRE)
+        if (self.ig_oas is not None and self.ig_oas > 1.0) or (
+            self.banks_offhi is not None and self.banks_offhi < -0.08
+        ):
+            return "spreading (quality/banks)"
+        # bottom-edge leak: private credit or the CCC tier cracking while the top is calm
+        disp = self.dispersion
+        if (self.bdc_offhi is not None and self.bdc_offhi < -0.05) or (
+            disp is not None and disp > 7
+        ):
+            return "leaking (bottom edge)"
+        return "calm"
+
+
+def credit_stress() -> CreditStress:
+    """Broad Clock B — corporate quality ladder (FRED) + the levered/shadow-bank edge."""
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    stale: list[str] = []
+    for key, (sid, per) in _CREDIT_LADDER.items():
+        latest, prior, is_stale = _fred_metric(sid, per)
+        vals[key] = (latest, prior)
+        if is_stale:
+            stale.append(sid)
+
+    def _chg(key: str) -> float | None:
+        latest, prior = vals[key]
+        return (latest - prior) if (latest is not None and prior is not None) else None
+
+    def _edge(ticker: str) -> tuple[float | None, float | None]:
+        try:
+            s = _close(ticker, "6mo").dropna()
+            offhi = float(s.iloc[-1] / s.tail(63).max() - 1)
+            d5 = float(s.iloc[-1] / s.iloc[-6] - 1) if len(s) > 5 else None
+            return offhi, d5
+        except Exception:
+            return None, None
+
+    bdc_offhi, bdc_5d = _edge("BIZD")
+    loans_offhi, _ = _edge("BKLN")
+    banks_offhi, _ = _edge("KRE")
+
+    return CreditStress(
+        ig_oas=vals["ig"][0],
+        bb_oas=vals["bb"][0],
+        hy_oas=vals["hy"][0],
+        ccc_oas=vals["ccc"][0],
+        ccc_chg=_chg("ccc"),
+        ig_chg=_chg("ig"),
+        bdc_offhi=bdc_offhi,
+        bdc_5d=bdc_5d,
+        loans_offhi=loans_offhi,
+        banks_offhi=banks_offhi,
+        stale=tuple(stale),
+    )
+
+
+# ---------- funding plumbing (Clock B — the repo / liquidity channel) ----------
+# A different failure mode than credit spreads: the money-market plumbing. SOFR
+# spiking above IORB = repo stress (the Sept-2019 blowup). RRP near zero = the
+# liquidity buffer that's absorbed QT is exhausted, so further tightening drains
+# *reserves* directly; reserves toward the ~$3T "scarcity zone" = funding gets
+# tight. Slow/systemic, all free FRED — the classic place a systemic crack shows.
+
+_FUNDING_SERIES = {
+    "sofr": ("SOFR", 21),  # secured overnight financing rate, %
+    "iorb": ("IORB", 21),  # interest on reserve balances, % (the floor)
+    "rrp": ("RRPONTSYD", 21),  # overnight reverse repo, $B (the buffer)
+    "reserves": ("WRESBAL", 4),  # bank reserves, $millions (weekly)
+}
+
+
+@dataclass(frozen=True, slots=True)
+class FundingStress:
+    sofr: float | None  # %
+    iorb: float | None  # %
+    sofr_iorb: float | None  # SOFR minus IORB, pp (>0 = repo paying up = stress)
+    rrp: float | None  # $B (near 0 = buffer drained)
+    rrp_chg: float | None  # vs ~1mo, $B
+    reserves: float | None  # $B
+    reserves_chg: float | None  # vs ~1mo, $B (draining = tightening)
+    stale: tuple[str, ...]
+
+    @property
+    def band(self) -> str:
+        if self.sofr_iorb is not None and self.sofr_iorb > 0.05:  # SOFR >5bp over IORB
+            return "repo stress"
+        if self.rrp is not None and self.rrp < 50:  # buffer effectively gone
+            return "buffer drained"
+        return "ample"
+
+
+def funding_stress() -> FundingStress:
+    """Money-market plumbing — repo (SOFR-IORB) + the RRP/reserves liquidity buffer."""
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    stale: list[str] = []
+    for key, (sid, per) in _FUNDING_SERIES.items():
+        latest, prior, is_stale = _fred_metric(sid, per)
+        vals[key] = (latest, prior)
+        if is_stale:
+            stale.append(sid)
+
+    sofr, iorb = vals["sofr"][0], vals["iorb"][0]
+    sofr_iorb = (sofr - iorb) if (sofr is not None and iorb is not None) else None
+    rrp_latest, rrp_prior = vals["rrp"]
+    res_latest, res_prior = vals["reserves"]
+    res_b = (res_latest / 1000) if res_latest is not None else None  # $millions → $B
+    res_chg = ((res_latest - res_prior) / 1000) if (res_latest and res_prior) else None
+
+    return FundingStress(
+        sofr=sofr,
+        iorb=iorb,
+        sofr_iorb=sofr_iorb,
+        rrp=rrp_latest,
+        rrp_chg=(rrp_latest - rrp_prior) if (rrp_latest and rrp_prior) else None,
+        reserves=res_b,
+        reserves_chg=res_chg,
+        stale=tuple(stale),
+    )
+
+
+# ---------- private credit (Clock B — the on-thesis shadow-bank / AI-infra-debt edge) ----------
+# The free *approximation* of the bomb the thesis keeps naming: the cleanest signals
+# (CDS, CLO spreads, BDC NAV discounts) are paywalled, so we proxy with equities.
+# Two baskets: (1) the private-credit complex — direct-lending BDCs + the PC-heavy
+# alt managers (Ares/Blue Owl); rolling off-highs ≈ discounts widening. (2) the
+# AI-infra-debt edge — neoclouds + debt-funded datacenter builds (CRWV/ORCL/VRT).
+# Equity-noisy, so read it as confirmation of the spread/funding leaks, not alone.
+
+_PC_COMPLEX = ("ARCC", "BXSL", "FSK", "BIZD", "OBDC", "ARES", "OWL")  # BDCs + PC sponsors
+_INFRA_DEBT = ("ORCL", "VRT", "DLR")  # debt-funded build: Oracle + power/datacenter REIT
+
+
+@dataclass(frozen=True, slots=True)
+class PrivateCredit:
+    pc_offhi: float | None  # avg off-63d-high, private-credit complex
+    pc_5d: float | None
+    pc_n: int
+    pc_worst: tuple[str, float] | None  # most-stressed single name (ticker, off-hi)
+    infra_offhi: float | None  # avg off-high, AI-infra-debt edge
+    infra_5d: float | None
+    infra_n: int
+    infra_worst: tuple[str, float] | None
+
+    @property
+    def band(self) -> str:
+        vals = [v for v in (self.pc_offhi, self.infra_offhi) if v is not None]
+        worst = min(vals) if vals else 0.0
+        if worst <= -0.15:
+            return "cracking"
+        if worst <= -0.07:
+            return "stressed"
+        return "calm"
+
+
+def _basket_stress(
+    tickers: tuple[str, ...],
+) -> tuple[float | None, float | None, int, tuple[str, float] | None]:
+    """(avg off-63d-high, avg 5d, n resolved, worst (ticker, off-hi)) for a basket."""
+    offs: list[tuple[str, float]] = []
+    d5s: list[float] = []
+    for t in tickers:
+        try:
+            s = _close(t, "6mo").dropna()
+            offs.append((t, float(s.iloc[-1] / s.tail(63).max() - 1)))
+            if len(s) > 5:
+                d5s.append(float(s.iloc[-1] / s.iloc[-6] - 1))
+        except Exception:
+            continue
+    if not offs:
+        return None, None, 0, None
+    avg_off = sum(o for _, o in offs) / len(offs)
+    avg_5d = (sum(d5s) / len(d5s)) if d5s else None
+    return avg_off, avg_5d, len(offs), min(offs, key=lambda x: x[1])
+
+
+def private_credit() -> PrivateCredit:
+    """The shadow-bank / AI-infra-debt edge (equity proxy — free approximation)."""
+    pc_off, pc_5d, pc_n, pc_worst = _basket_stress(_PC_COMPLEX)
+    inf_off, inf_5d, inf_n, inf_worst = _basket_stress(_INFRA_DEBT)
+    return PrivateCredit(
+        pc_offhi=pc_off,
+        pc_5d=pc_5d,
+        pc_n=pc_n,
+        pc_worst=pc_worst,
+        infra_offhi=inf_off,
+        infra_5d=inf_5d,
+        infra_n=inf_n,
+        infra_worst=inf_worst,
+    )
+
+
+# ---------- neocloud watch (Clock B — the sharpest, most faith-dependent edge) ----------
+# The levered GPU-cloud operators: pure neoclouds (CRWV/NBIS/BRUN) + the BTC miners
+# pivoting to AI compute (IREN/WULF/CORZ/APLD/CIFR/HUT). The purest 2000-telecom
+# analog — debt/equity-financed compute capacity betting demand shows up. The *first*
+# place the AI-capex-ROI question bites. Bifurcation (some wrecked, holders fine) =
+# name-specific stress, not yet a complex meltdown. Equity proxy; `macro neocloud` = full table.
+_NEOCLOUDS = {
+    "CRWV": "CoreWeave — flagship GPU cloud",
+    "NBIS": "Nebius — Amsterdam AI cloud (ex-Yandex)",
+    "BRUN": "Boost Run — micro neocloud (founded 2025, 3 employees)",
+    "IREN": "IREN — BTC miner → AI compute",
+    "WULF": "TeraWulf — miner → AI compute",
+    "CORZ": "Core Scientific — hosts CoreWeave",
+    "APLD": "Applied Digital — AI/HPC hosting",
+    "CIFR": "Cipher — miner → AI compute",
+    "HUT": "Hut 8 — miner → AI compute",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Neocloud:
+    avg_offhi: float | None  # basket avg off-63d-high
+    avg_5d: float | None
+    n: int
+    n_cracking: int  # how many are >15% off their high
+    names: tuple[tuple[str, float, float | None], ...]  # (ticker, off-hi, 5d), worst-first
+
+    @property
+    def band(self) -> str:
+        if self.avg_offhi is None:
+            return "n/a"
+        if self.avg_offhi <= -0.15:
+            return "cracking"
+        if self.avg_offhi <= -0.07:
+            return "stressed"
+        return "calm"
+
+
+def neocloud() -> Neocloud:
+    """The levered AI-compute operators — the sharpest, most faith-dependent Clock-B edge."""
+    rows: list[tuple[str, float, float | None]] = []
+    for t in _NEOCLOUDS:
+        try:
+            s = _close(t, "6mo").dropna()
+            off = float(s.iloc[-1] / s.tail(63).max() - 1)
+            d5 = float(s.iloc[-1] / s.iloc[-6] - 1) if len(s) > 5 else None
+            rows.append((t, off, d5))
+        except Exception:
+            continue
+    rows.sort(key=lambda r: r[1])  # worst off-high first
+    offs = [o for _, o, _ in rows]
+    d5s = [d for _, _, d in rows if d is not None]
+    return Neocloud(
+        avg_offhi=(sum(offs) / len(offs)) if offs else None,
+        avg_5d=(sum(d5s) / len(d5s)) if d5s else None,
+        n=len(rows),
+        n_cracking=sum(1 for o in offs if o <= -0.15),
+        names=tuple(rows),
+    )
+
+
 # ---------- consumer health (the demand base that ultimately funds AI) ----------
 # Almost every AI-funding dollar traces back to the consumer (ad rev, retail) or to
 # capital markets (the untethered, fragile part). This panel instruments the consumer
@@ -763,6 +1214,8 @@ _CONSUMER_SERIES = {
     "savings": ("PSAVERT", 12),  # personal saving rate (%) — the stretch
     "revolving": ("REVOLSL", 12),  # revolving consumer credit — the borrowing
     "cc_delinq": ("DRCCLACBS", 4),  # credit-card delinquency rate (%, quarterly) — the crack
+    "debt_service": ("TDSP", 4),  # household debt-service ratio (% of DPI, quarterly) — the stretch
+    "claims": ("ICSA", 13),  # initial jobless claims (weekly) — the labor-migration tell
     "sentiment": ("UMCSENT", 12),  # UMich consumer sentiment — the soft leading read
 }
 
@@ -775,6 +1228,10 @@ class ConsumerHealth:
     revolving_yoy: float | None  # revolving credit growth YoY
     cc_delinq: float | None  # credit-card delinquency rate, %
     cc_delinq_chg: float | None  # delinquency change vs ~1yr ago, pp (rising = cracking)
+    debt_service: float | None  # household debt-service ratio, % of DPI (the stretch)
+    debt_service_chg: float | None  # change vs ~1yr ago, pp (rising = more income to debt)
+    claims: float | None  # initial jobless claims, weekly level (the labor-migration tell)
+    claims_chg: float | None  # change vs ~13 weeks ago (rising = bottom-half stress → labor)
     sentiment: float | None
     resolved: int  # FRED series that fetched live (pipeline health)
     total: int
@@ -829,19 +1286,158 @@ def consumer_health() -> ConsumerHealth:
             stale.append(sid)
         vals[key] = (latest, prior)
 
-    cc_latest, cc_prior = vals["cc_delinq"]
+    def _diff(pair: tuple[float | None, float | None]) -> float | None:
+        latest, prior = pair
+        return (latest - prior) if (latest is not None and prior is not None) else None
+
+    cc_latest, _ = vals["cc_delinq"]
     return ConsumerHealth(
         pce_yoy=_yoy(*vals["real_pce"]),
         dpi_yoy=_yoy(*vals["real_dpi"]),
         savings=vals["savings"][0],
         revolving_yoy=_yoy(*vals["revolving"]),
         cc_delinq=cc_latest,
-        cc_delinq_chg=(
-            (cc_latest - cc_prior) if (cc_latest is not None and cc_prior is not None) else None
-        ),
+        cc_delinq_chg=_diff(vals["cc_delinq"]),
+        debt_service=vals["debt_service"][0],
+        debt_service_chg=_diff(vals["debt_service"]),
+        claims=vals["claims"][0],
+        claims_chg=_diff(vals["claims"]),
         sentiment=vals["sentiment"][0],
         resolved=resolved,
         total=total,
+        stale=tuple(stale),
+    )
+
+
+# ---------- distribution (who gets the productivity gains) ----------
+# The missing link between the AI-ROI thesis and the consumer panel. A real
+# productivity boom only ROIs if the gains reach the demand base. If productivity
+# outruns pay and labor share falls, the margin stays with capital (the K-shape) —
+# the capex's own future customers get income-capped, which *slows Clock A* (ROI)
+# even as Clock B (credit) keeps ticking. "Is this boom feeding its customers or
+# eating them?" See ai-infra-cycle-top.md (fallacy-of-composition / two clocks).
+_DIST_SERIES = {
+    "labor_share": ("PRS85006173", 4),  # nonfarm-biz labor share, index 2017=100
+    "productivity": ("OPHNFB", 4),  # output per hour — the real boom
+    "real_comp": ("COMPRNFB", 4),  # real compensation per hour — labor's cut
+    "profits": ("CP", 4),  # corporate profits after tax — capital's cut
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Distribution:
+    labor_share: float | None  # index, 2017=100 (<100 = below baseline)
+    labor_share_yoy: float | None  # falling = gains shifting to capital
+    productivity_yoy: float | None  # output/hr growth — the boom
+    real_comp_yoy: float | None  # real pay growth — labor's participation
+    profits_yoy: float | None  # corp profits growth — capital's participation
+    stale: tuple[str, ...]
+
+    @property
+    def gap(self) -> float | None:
+        """Productivity growth minus real-pay growth; >0 = the wedge escaping labor."""
+        if self.productivity_yoy is None or self.real_comp_yoy is None:
+            return None
+        return self.productivity_yoy - self.real_comp_yoy
+
+    @property
+    def to_capital(self) -> bool:
+        """Gains accruing to capital: productivity outruns pay AND labor share falling."""
+        g = self.gap
+        return bool(g is not None and g > 0 and (self.labor_share_yoy or 0) < 0)
+
+
+def distribution() -> Distribution:
+    """Who captures the productivity boom — labor or capital — from FRED, cached."""
+
+    def _yoy(latest: float | None, prior: float | None) -> float | None:
+        if latest is None or prior is None or prior == 0:
+            return None
+        return latest / prior - 1
+
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    stale: list[str] = []
+    for key, (sid, per) in _DIST_SERIES.items():
+        latest, prior, is_stale = _fred_metric(sid, per)
+        if is_stale:
+            stale.append(sid)
+        vals[key] = (latest, prior)
+
+    return Distribution(
+        labor_share=vals["labor_share"][0],
+        labor_share_yoy=_yoy(*vals["labor_share"]),
+        productivity_yoy=_yoy(*vals["productivity"]),
+        real_comp_yoy=_yoy(*vals["real_comp"]),
+        profits_yoy=_yoy(*vals["profits"]),
+        stale=tuple(stale),
+    )
+
+
+# ---------- labor (jobs — the consumer's income engine + the AI-substitution tell) ----------
+# Jobs are where two threads meet: (1) the consumer demand base (Clock A) runs on
+# wage income, so a softening labor market erodes it; (2) AI substitution, if real,
+# shows up here first as tech layoffs. The Sahm rule is the cleanest recession
+# trigger (unemployment momentum); JOLTS quits = worker confidence; tech-sector
+# employment YoY = the AI-substitution tell. All free FRED.
+_LABOR_SERIES = {
+    "unrate": ("UNRATE", 12),  # unemployment rate, %
+    "payems": ("PAYEMS", 1),  # nonfarm payrolls level (MoM diff = job adds)
+    "claims": ("CCSA", 4),  # continued claims (level)
+    "openings": ("JTSJOL", 12),  # job openings (JOLTS), thousands
+    "quits": ("JTSQUR", 12),  # quits rate (JOLTS), %
+    "sahm": ("SAHMREALTIME", 1),  # Sahm-rule recession indicator
+    "tech": ("CES6054150001", 12),  # computer-systems-design employment (tech proxy)
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Labor:
+    unrate: float | None  # %
+    unrate_chg: float | None  # vs ~1yr, pp
+    payrolls_mom: float | None  # MoM change in payrolls, thousands
+    quits: float | None  # quits rate, %
+    openings: float | None  # job openings, thousands
+    sahm: float | None  # Sahm-rule value (triggers recession call at >=0.5)
+    tech_yoy: float | None  # tech-sector employment YoY (AI-substitution tell)
+    continued_claims: float | None  # level
+    stale: tuple[str, ...]
+
+    @property
+    def band(self) -> str:
+        if self.sahm is not None and self.sahm >= 0.50:
+            return "recession signal"
+        if self.sahm is not None and self.sahm >= 0.30:
+            return "softening"
+        return "firm"
+
+
+def labor() -> Labor:
+    """The labor market — Sahm trigger, JOLTS, tech-employment — from FRED, cached."""
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    stale: list[str] = []
+    for key, (sid, per) in _LABOR_SERIES.items():
+        latest, prior, is_stale = _fred_metric(sid, per)
+        vals[key] = (latest, prior)
+        if is_stale:
+            stale.append(sid)
+
+    def _diff(key: str) -> float | None:
+        latest, prior = vals[key]
+        return (latest - prior) if (latest is not None and prior is not None) else None
+
+    def _yoy(key: str) -> float | None:
+        latest, prior = vals[key]
+        return (latest / prior - 1) if (latest and prior) else None
+
+    return Labor(
+        unrate=vals["unrate"][0],
+        unrate_chg=_diff("unrate"),
+        payrolls_mom=_diff("payems"),
+        quits=vals["quits"][0],
+        openings=vals["openings"][0],
+        sahm=vals["sahm"][0],
+        tech_yoy=_yoy("tech"),
+        continued_claims=vals["claims"][0],
         stale=tuple(stale),
     )
 
@@ -865,6 +1461,161 @@ def fred_health() -> list[tuple[str, str, str]]:
         except Exception as e:
             out.append((sid, "FAIL", f"{name}: {type(e).__name__}"))
     return out
+
+
+# ---------- retail froth (the payload size, not the fuse) ----------
+# Retail flooding in is fuel + amplifier, NOT the trigger (credit + ROI are). This
+# instruments *how late / how big*: leverage (margin debt), speculative appetite
+# (high-beta vs low-vol), and the leveraged single-stock ETF "casino" — ripping =
+# froth on, cratering = the speculative crowd getting wrecked. Pairs with the F&G
+# put/call sub (retail options). See ai-infra-cycle-top.md (box #4).
+
+_LEVERED_SINGLE = ("MSTU", "NVDL", "TSLL")  # 2x single-stock ETFs — the casino tell
+
+
+@dataclass(frozen=True, slots=True)
+class RetailFroth:
+    margin_debt: float | None  # $B (FRED Z.1 households margin, quarterly)
+    margin_yoy: float | None  # leverage growth YoY
+    high_beta_offhi: float | None  # SPHB/SPLV off its 63d high
+    high_beta_5d: float | None  # 5d change in the high-beta/low-vol ratio
+    casino_5d: float | None  # avg 5d of the levered single-stock ETF basket
+    casino_offhi: float | None  # avg off-63d-high (deeply negative = casino unwinding)
+    casino_n: int  # how many levered ETFs resolved
+
+
+def _ratio_read(num: str, den: str) -> tuple[float | None, float | None]:
+    """(off-63d-high, 5d change) for a num/den price ratio. None on failure."""
+    try:
+        df = pd.concat([_close(num, "6mo"), _close(den, "6mo")], axis=1).dropna()
+        df.columns = ["a", "b"]
+        r = df["a"] / df["b"]
+        offhi = float(r.iloc[-1] / r.tail(63).max() - 1)
+        d5 = float(r.iloc[-1] / r.iloc[-6] - 1) if len(r) > 5 else None
+        return offhi, d5
+    except Exception:
+        return None, None
+
+
+def retail_froth() -> RetailFroth:
+    """How late / how big the retail flood is — leverage + speculation, price-based + 1 FRED."""
+    md_latest, md_prior, _ = _fred_metric("BOGZ1FL663067003Q", 4)  # quarterly → YoY = 4 obs
+    margin_debt = (md_latest / 1000) if md_latest is not None else None  # $millions → $B
+    margin_yoy = (md_latest / md_prior - 1) if (md_latest and md_prior) else None
+
+    hb_offhi, hb_5d = _ratio_read("SPHB", "SPLV")
+
+    offhis: list[float] = []
+    d5s: list[float] = []
+    for t in _LEVERED_SINGLE:
+        try:
+            s = _close(t, "6mo")
+            offhis.append(float(s.iloc[-1] / s.tail(63).max() - 1))
+            if len(s) > 5:
+                d5s.append(float(s.iloc[-1] / s.iloc[-6] - 1))
+        except Exception:
+            continue
+
+    return RetailFroth(
+        margin_debt=margin_debt,
+        margin_yoy=margin_yoy,
+        high_beta_offhi=hb_offhi,
+        high_beta_5d=hb_5d,
+        casino_5d=(sum(d5s) / len(d5s)) if d5s else None,
+        casino_offhi=(sum(offhis) / len(offhis)) if offhis else None,
+        casino_n=len(offhis),
+    )
+
+
+# ---------- retail attention (search + social — the froth's "who's showing up") ----------
+# A magnitude/lateness proxy (same axis as retail_froth, NOT a trigger): is the
+# non-trader public flooding in? Two cheap, slow-moving feeds, refreshed ~1-2x/month
+# (the data doesn't change day-to-day): Google Trends (hand-entered search interest
+# for a retail-attention basket) + WSB mention velocity (ApeWisdom, free/no-key).
+# Reads retail_attention.json; refresh the WSB half with refresh_retail_attention().
+
+_RETAIL_ATTENTION_FILE = Path("retail_attention.json")
+_APEWISDOM_URL = "https://apewisdom.io/api/v1.0/filter/wallstreetbets/page/1"
+
+
+@dataclass(frozen=True, slots=True)
+class RetailAttention:
+    asof: str | None
+    trends_index: float | None  # avg Google-Trends search interest across the basket (0-100)
+    trends_chg: float | None  # avg change vs prior pull (pp)
+    terms: tuple[tuple[str, float], ...]  # (term, level) for display
+    wsb_total: int | None  # total mentions across the tracked top names
+    wsb_chg: float | None  # vs ~24h-ago total (mention velocity)
+    wsb_top: tuple[tuple[str, int, int], ...]  # (ticker, mentions, mentions_24h_ago)
+    note: str | None
+
+
+def retail_attention() -> RetailAttention | None:
+    """Retail-attention proxy (Google Trends basket + WSB mentions), from cache."""
+    try:
+        cfg = json.loads(_RETAIL_ATTENTION_FILE.read_text())
+        gt = cfg.get("google_trends", {})
+        terms = gt.get("terms", {}) or {}
+        prior = gt.get("prior", {}) or {}
+        items = [(k, float(v)) for k, v in terms.items() if v is not None]
+        idx = (sum(v for _, v in items) / len(items)) if items else None
+        chgs = [
+            float(terms[k]) - float(prior[k])
+            for k in terms
+            if terms.get(k) is not None and prior.get(k) is not None
+        ]
+        trends_chg = (sum(chgs) / len(chgs)) if chgs else None
+
+        wsb = cfg.get("wsb", {})
+        top = tuple(
+            (str(t[0]), int(t[1]), int(t[2])) for t in wsb.get("top", []) if len(t) >= 3
+        )
+        wsb_total = sum(m for _, m, _ in top) or None
+        prior_total = sum(p for _, _, p in top) or None
+        wsb_chg = (wsb_total / prior_total - 1) if (wsb_total and prior_total) else None
+
+        return RetailAttention(
+            asof=cfg.get("asof"),
+            trends_index=idx,
+            trends_chg=trends_chg,
+            terms=tuple(items),
+            wsb_total=wsb_total,
+            wsb_chg=wsb_chg,
+            wsb_top=top,
+            note=cfg.get("note"),
+        )
+    except Exception:
+        return None
+
+
+def refresh_retail_attention(top_n: int = 15) -> RetailAttention | None:
+    """Pull WSB mentions (ApeWisdom, free) into retail_attention.json. Run ~1-2x/month.
+
+    Preserves the hand-entered google_trends block; only refreshes the wsb half.
+    """
+    try:
+        cfg = json.loads(_RETAIL_ATTENTION_FILE.read_text())
+    except Exception:
+        cfg = {}
+    req = urllib.request.Request(_APEWISDOM_URL, headers=_BROWSER_HEADERS)
+    data = json.loads(urllib.request.urlopen(req, timeout=15).read().decode())
+    rows = data.get("results", [])[:top_n]
+    top = [
+        [r.get("ticker"), int(r.get("mentions") or 0), int(r.get("mentions_24h_ago") or 0)]
+        for r in rows
+    ]
+    cfg["wsb"] = {
+        "asof": date.today().isoformat(),
+        "source": "ApeWisdom / r/wallstreetbets",
+        "top": top,
+    }
+    cfg.setdefault(
+        "google_trends",
+        {"source": "trends.google.com US 12m — hand-entered 0-100", "terms": {}, "prior": {}},
+    )
+    cfg["asof"] = date.today().isoformat()
+    _RETAIL_ATTENTION_FILE.write_text(json.dumps(cfg, indent=2))
+    return retail_attention()
 
 
 # ---------- formatting ----------
@@ -908,6 +1659,31 @@ def main() -> None:
             print(f"  [{mark}] {sid:14} {detail}")
         ok = sum(1 for _, s, _ in rows if s == "ok")
         print(f"  → {ok}/{len(rows)} series live")
+        return
+    if "makers" in sys.argv[1:]:
+        m = makers()
+        avg = f"{m.avg_offhi:+.1%}" if m.avg_offhi is not None else "—"
+        print(f"=== bottleneck makers  avg {avg} off-hi (n={m.n}) ===")
+        for t, off, d5 in m.names:
+            d5s = f"{d5:+6.1%}" if d5 is not None else "   —  "
+            print(f"  {t:11} off-hi {off:+6.1%}  5d {d5s}   {_MAKERS.get(t, '')}")
+        return
+    if "neocloud" in sys.argv[1:]:
+        nc = neocloud()
+        avg = f"{nc.avg_offhi:+.1%}" if nc.avg_offhi is not None else "—"
+        print(f"=== neocloud [{nc.band}] avg {avg} off-hi · {nc.n_cracking}/{nc.n} cracking ===")
+        for t, off, d5 in nc.names:
+            d5s = f"{d5:+6.1%}" if d5 is not None else "   —  "
+            print(f"  {t:5} off-hi {off:+6.1%}  5d {d5s}   {_NEOCLOUDS.get(t, '')}")
+        return
+    if "attention" in sys.argv[1:]:
+        print("=== refreshing retail attention (WSB via ApeWisdom) ===")
+        ra = refresh_retail_attention()
+        if ra and ra.wsb_top:
+            print(f"  WSB top: {', '.join(f'{t}({m})' for t, m, _ in ra.wsb_top[:8])}")
+            print(f"  wrote {_RETAIL_ATTENTION_FILE} (asof {ra.asof}); fill google_trends by hand")
+        else:
+            print("  refresh failed")
         return
     print(build())
 

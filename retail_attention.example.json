@@ -1,0 +1,15 @@
+{
+  "_comment": "Copy to retail_attention.json (gitignored). A retail-attention proxy (magnitude/lateness, NOT a trigger — pairs with retail_froth). Refresh ~1-2x/month; this data moves on weekly/monthly timescales, no need for daily pulls. WSB half auto-fills via `uv run python -m degen.macro attention` (ApeWisdom, free). Google-Trends half is hand-entered: open trends.google.com (US, 12m), read the 0-100 interest for each term, drop today's into terms and last month's into prior.",
+  "asof": "YYYY-MM-DD",
+  "google_trends": {
+    "source": "trends.google.com US 12m — hand-entered 0-100",
+    "terms": {"buy stocks": null, "AI stocks": null, "options trading": null, "day trading": null},
+    "prior": {"buy stocks": null, "AI stocks": null, "options trading": null, "day trading": null}
+  },
+  "wsb": {
+    "asof": "YYYY-MM-DD",
+    "source": "ApeWisdom / r/wallstreetbets",
+    "top": [["TICKER", 0, 0]]
+  },
+  "note": "rising search interest + WSB mention velocity = the non-trader public flooding in"
+}

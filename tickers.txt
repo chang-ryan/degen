@@ -24,6 +24,7 @@ MU
 STX
 SNDK
 WDC
+EWY                # iShares MSCI S. Korea — ~25% Samsung + ~10% SK Hynix = live memory-duopoly + Asia-risk proxy
 
 # ── Semis: logic / CPU / GPU ──
 NVDA
@@ -32,6 +33,9 @@ AMD
 ARM
 MRVL
 INTC
+
+# ── Mega-cap (TA / equity-ownership entries) ──
+AMZN               # TA entry: 50wMA ($232) + 200dMA + 2026 yearly open ($226) confluence — see theses/amzn-ta-equity.md
 
 # ── Optics ──
 COHR
@@ -68,3 +72,4 @@ XHB
 
 # ── Idio / biotech (uncorrelated to momo complex) ──
 ABVX               # obefazimod Ph3 update Jun/Jul 2026 — see theses/abvx-ph3-idio.md
+NOC                # Northrop — defense/idio; TA buy: testing rising 200wk MA (~$494), wk RSI ~18, -32% off high

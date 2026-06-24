@@ -11,7 +11,17 @@ import importlib.util
 import pathlib
 
 from degen.ai_demand import _mtok
-from degen.macro import ConsumerHealth, CryptoCredit
+from degen.macro import (
+    ConsumerHealth,
+    CreditStress,
+    CryptoCredit,
+    Distribution,
+    FundingStress,
+    Labor,
+    Neocloud,
+    PrivateCredit,
+    RoiCoverage,
+)
 
 
 def _cc(strc: float | None) -> CryptoCredit:
@@ -38,7 +48,8 @@ def test_crypto_stress_trigger() -> None:
 def _consumer(pce: float | None, dpi: float | None) -> ConsumerHealth:
     return ConsumerHealth(
         pce_yoy=pce, dpi_yoy=dpi, savings=None, revolving_yoy=None,
-        cc_delinq=None, cc_delinq_chg=None, sentiment=None, resolved=0, total=6, stale=(),
+        cc_delinq=None, cc_delinq_chg=None, debt_service=None, debt_service_chg=None,
+        claims=None, claims_chg=None, sentiment=None, resolved=0, total=8, stale=(),
     )
 
 
@@ -46,6 +57,104 @@ def test_consumer_gap() -> None:
     assert round(_consumer(0.021, -0.011).gap, 3) == 0.032  # spending outruns income
     assert _consumer(0.01, 0.03).gap < 0  # income outruns spending
     assert _consumer(None, 0.02).gap is None
+
+
+def _dist(prod: float | None, comp: float | None, ls_yoy: float | None) -> Distribution:
+    return Distribution(
+        labor_share=95.0, labor_share_yoy=ls_yoy, productivity_yoy=prod,
+        real_comp_yoy=comp, profits_yoy=None, stale=(),
+    )
+
+
+def test_distribution_wedge_and_capital() -> None:
+    d = _dist(0.028, 0.006, -0.029)  # the live read: boom escaping labor
+    assert round(d.gap, 3) == 0.022  # productivity outruns pay by 2.2pp
+    assert d.to_capital is True  # wedge>0 AND labor share falling
+    assert _dist(0.01, 0.03, 0.01).gap < 0  # pay outruns productivity
+    assert _dist(0.03, 0.01, 0.02).to_capital is False  # wedge>0 but labor share rising
+    assert _dist(None, 0.01, -0.02).gap is None
+
+
+def _roi(arr_g: float | None, cap_g: float | None) -> RoiCoverage:
+    return RoiCoverage(
+        asof="2026-06-22", total_arr=54.0, capex=400.0, coverage=0.135,
+        exo_coverage=0.088, circular_pct=0.35, arr_growth=arr_g, capex_growth=cap_g,
+        vol_growth=None, labs=(("OpenAI", 30.0), ("Anthropic", 24.0)), note=None,
+    )
+
+
+def test_roi_coverage_closing() -> None:
+    assert _roi(1.50, 0.60).closing is True  # ARR outgrowing capex → gap closing
+    assert _roi(0.20, 0.60).closing is False  # capex outrunning ARR → gap widening
+    assert _roi(None, 0.60).closing is None
+
+
+def _credit(ig: float, ccc: float, bdc: float | None, banks: float | None) -> CreditStress:
+    return CreditStress(
+        ig_oas=ig, bb_oas=1.5, hy_oas=2.6, ccc_oas=ccc, ccc_chg=None, ig_chg=None,
+        bdc_offhi=bdc, bdc_5d=None, loans_offhi=-0.01, banks_offhi=banks, stale=(),
+    )
+
+
+def test_credit_stress_bands() -> None:
+    # live read: IG tight, CCC dispersion wide, private credit rolling, banks calm
+    leak = _credit(0.74, 9.47, -0.079, 0.0)
+    assert round(leak.dispersion, 2) == 8.73
+    assert leak.band == "leaking (bottom edge)"
+    assert _credit(1.20, 9.47, -0.079, 0.0).band == "spreading (quality/banks)"  # IG widened
+    assert _credit(0.74, 9.47, -0.02, -0.10).band == "spreading (quality/banks)"  # banks broke
+    assert _credit(0.74, 5.0, -0.01, 0.0).band == "calm"  # tight dispersion, edge fine
+
+
+def _funding(sofr_iorb: float, rrp: float) -> FundingStress:
+    return FundingStress(
+        sofr=3.61, iorb=3.61 - sofr_iorb, sofr_iorb=sofr_iorb, rrp=rrp, rrp_chg=None,
+        reserves=3033.0, reserves_chg=None, stale=(),
+    )
+
+
+def test_funding_stress_bands() -> None:
+    assert _funding(-0.04, 6.5).band == "buffer drained"  # live: RRP gone, no repo stress
+    assert _funding(0.08, 6.5).band == "repo stress"  # SOFR firmly over IORB
+    assert _funding(-0.04, 400.0).band == "ample"  # buffer intact, repo calm
+
+
+def _pc(pc_off: float, infra_off: float) -> PrivateCredit:
+    return PrivateCredit(
+        pc_offhi=pc_off, pc_5d=None, pc_n=7, pc_worst=("OWL", pc_off),
+        infra_offhi=infra_off, infra_5d=None, infra_n=4, infra_worst=("ORCL", infra_off),
+    )
+
+
+def test_private_credit_bands() -> None:
+    assert _pc(-0.09, -0.19).band == "cracking"  # live: infra-debt edge cracking
+    assert _pc(-0.09, -0.04).band == "stressed"  # PC complex stressed, infra ok
+    assert _pc(-0.03, -0.02).band == "calm"
+
+
+def _neo(avg: float) -> Neocloud:
+    return Neocloud(avg_offhi=avg, avg_5d=None, n=9, n_cracking=2, names=())
+
+
+def test_neocloud_bands() -> None:
+    assert _neo(-0.16).band == "cracking"
+    assert _neo(-0.09).band == "stressed"  # live: bifurcated, avg ~-9%
+    assert _neo(-0.03).band == "calm"
+    assert Neocloud(None, None, 0, 0, ()).band == "n/a"
+
+
+def _labor(sahm: float | None) -> Labor:
+    return Labor(
+        unrate=4.3, unrate_chg=0.2, payrolls_mom=80.0, quits=1.9, openings=7618.0,
+        sahm=sahm, tech_yoy=-0.01, continued_claims=1810000.0, stale=(),
+    )
+
+
+def test_labor_sahm_bands() -> None:
+    assert _labor(0.10).band == "firm"  # live
+    assert _labor(0.30).band == "softening"
+    assert _labor(0.55).band == "recession signal"  # Sahm triggered
+    assert _labor(None).band == "firm"  # no signal → not flagged
 
 
 def test_mtok_pricing_conversion() -> None:

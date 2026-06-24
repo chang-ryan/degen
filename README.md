@@ -104,6 +104,7 @@ real positions, P&L, account info, hand-entered proprietary signal levels — is
 | `WATCHLIST.md` | `WATCHLIST.example.md` | candidate setups / triggers (book intentions) |
 | `cta_levels.json` | `cta_levels.example.json` | hand-entered CTA thresholds |
 | `memory_prices.json` | `memory_prices.example.json` | hand-entered DRAM/NAND contract-price prints vs forecast |
+| `roi_coverage.json` | `roi_coverage.example.json` | hand-entered lab ARR vs aggregate capex — the AI-ROI coverage gauge (Clock A) |
 | `.env` | (see `degen.edgar` / `degen.etrade`) | API keys / tokens |
 | `data/` | — | broker tokens, IV store, snapshots, filings, **Discord log + media**, `privacy_terms.txt` |
 | `discord_channels.json` | — | Discord channel ids for `degen.ingest.discord_log` |

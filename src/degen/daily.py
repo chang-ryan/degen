@@ -316,6 +316,115 @@ def _crypto_credit_block(c: macro.CryptoCredit) -> list[str]:
     return out
 
 
+def _retail_attention_block(r: macro.RetailAttention | None) -> list[str]:
+    if r is None:
+        return ["  attention: n/a (cp retail_attention.example.json → .json; `macro attention`)"]
+    out: list[str] = []
+    if r.trends_index is not None:
+        terms = ", ".join(f"{k} {v:.0f}" for k, v in r.terms[:4])
+        chg = f" ({r.trends_chg:+.0f}pp vs prior)" if r.trends_chg is not None else ""
+        out.append(
+            f"  search interest: idx {r.trends_index:.0f}/100{chg}  [{terms}]  (Google Trends)"
+        )
+    else:
+        out.append("  search interest: — (hand-enter google_trends in retail_attention.json)")
+    if r.wsb_total is not None:
+        vel = f" ({r.wsb_chg:+.0%}/24h)" if r.wsb_chg is not None else ""
+        top = ", ".join(t for t, _, _ in r.wsb_top[:6])
+        out.append(f"  WSB mentions   : {r.wsb_total:,} (top {len(r.wsb_top)}){vel}  top: {top}")
+    out.append(
+        "  read: retail-attention proxy — magnitude/lateness, not a trigger (pairs with froth). "
+        f"Refresh ~monthly; asof {r.asof}."
+    )
+    return out
+
+
+def _retail_froth_block(r: macro.RetailFroth) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    md = f"${r.margin_debt:,.0f}B ({p(r.margin_yoy)} YoY)" if r.margin_debt is not None else "n/a"
+    return [
+        f"  margin debt    : {md}  — leverage piling in (>~25% YoY = late-cycle)",
+        f"  high-beta      : SPHB/SPLV {p(r.high_beta_offhi)} off-hi, {p(r.high_beta_5d)}/5d  "
+        "— speculative appetite",
+        f"  casino (2x ETF): avg {p(r.casino_5d)}/5d, avg {p(r.casino_offhi)} off-hi  "
+        "— MSTU/NVDL/TSLL (cratering = spec crowd wrecked)",
+        "  read: the payload size, not the fuse — froth amplifies the move; credit + ROI "
+        "trigger the break. Pair with the F&G put/call sub.",
+    ]
+
+
+def _credit_stress_block(c: macro.CreditStress) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    def pct(x: float | None) -> str:
+        return f"{x:.2f}%" if x is not None else "—"
+
+    disp = f"{c.dispersion:.1f}pp" if c.dispersion is not None else "—"
+    cccc = f" ({p(c.ccc_chg, '+.2f')}pp/mo)" if c.ccc_chg is not None else ""
+    out = [
+        f"  quality ladder : IG {pct(c.ig_oas)}  BB {pct(c.bb_oas)}  HY {pct(c.hy_oas)}  "
+        f"CCC {pct(c.ccc_oas)}{cccc}",
+        f"  dispersion     : CCC-IG {disp}  [{c.band}]  (wide = stress stuck at the bottom)",
+        f"  levered edge   : private-credit/BDC {p(c.bdc_offhi)} off-hi ({p(c.bdc_5d)}/5d) · "
+        f"loans {p(c.loans_offhi)} · banks {p(c.banks_offhi)} off-hi",
+        "  read: CCC + private credit cracking while IG/banks calm = early/confined. IG "
+        "widening or banks breaking = stress reaching quality (systemic). Pairs w/ crypto_credit.",
+    ]
+    if c.stale:
+        out.append(f"  [stale: {','.join(c.stale)}]")
+    return out
+
+
+def _private_credit_block(pc: macro.PrivateCredit) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    def worst(w: tuple[str, float] | None) -> str:
+        return f"worst {w[0]} {w[1]:+.0%}" if w else ""
+
+    return [
+        f"  private credit : {p(pc.pc_offhi)} off-hi ({p(pc.pc_5d)}/5d, n={pc.pc_n})  "
+        f"{worst(pc.pc_worst)}  — BDCs + Ares/Blue Owl",
+        f"  build debt     : {p(pc.infra_offhi)} off-hi ({p(pc.infra_5d)}/5d, n={pc.infra_n})  "
+        f"{worst(pc.infra_worst)}  — Oracle/datacenter (ORCL/VRT/DLR); neoclouds → own panel",
+        f"  read: [{pc.band}] equity proxy for the shadow-bank/AI-infra-debt bomb (CDS/CLO/NAV "
+        "are paywalled). Confirms credit_stress; not a standalone trigger.",
+    ]
+
+
+def _neocloud_block(nc: macro.Neocloud) -> list[str]:
+    if nc.n == 0:
+        return ["  neocloud: n/a"]
+    avg = f"{nc.avg_offhi:+.1%}" if nc.avg_offhi is not None else "—"
+    worst = "  ".join(f"{t} {o:+.0%}" for t, o, _ in nc.names[:4])
+    return [
+        f"  neocloud edge  : avg {avg} off-hi ({nc.n_cracking}/{nc.n} cracking >15%)  [{nc.band}]",
+        f"  most-stressed  : {worst}",
+        "  read: levered GPU-cloud operators (CRWV/IREN/…) — most faith-dependent corner, cracks "
+        "first. Bifurcation = name-specific, not a complex meltdown yet. `macro neocloud` = full.",
+    ]
+
+
+def _funding_stress_block(f: macro.FundingStress) -> list[str]:
+    si = f"{f.sofr_iorb * 100:+.0f}bp" if f.sofr_iorb is not None else "—"
+    sofr = f"{f.sofr:.2f}%" if f.sofr is not None else "—"
+    iorb = f"{f.iorb:.2f}%" if f.iorb is not None else "—"
+    rrp = f"${f.rrp:,.0f}B" if f.rrp is not None else "—"
+    rrpc = f" ({f.rrp_chg:+,.0f}B/mo)" if f.rrp_chg is not None else ""
+    res = f"${f.reserves / 1000:.2f}T" if f.reserves is not None else "—"
+    resc = f" ({f.reserves_chg:+,.0f}B/mo)" if f.reserves_chg is not None else ""
+    return [
+        f"  SOFR-IORB    : {si}  (SOFR {sofr} vs IORB {iorb})  — >+5bp = repo stress",
+        f"  RRP buffer   : {rrp}{rrpc}  — near-zero = QT now drains reserves directly",
+        f"  bank reserves: {res}{resc}  — toward the ~$3T scarcity zone = funding tightens",
+        f"  read: [{f.band}] — plumbing leak is a different failure mode than spreads; "
+        "SOFR spiking >IORB = the 2019-repo channel. Pairs with credit_stress.",
+    ]
+
+
 def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
     def p(x: float | None, fmt: str = "+.1%") -> str:
         return format(x, fmt) if x is not None else "—"
@@ -331,20 +440,101 @@ def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
         else "—"
     )
     out.append(f"  CC delinquency : {delinq}   UMich sentiment {p(c.sentiment, '.0f')}")
+    ds = (
+        f"{c.debt_service:.1f}% of DPI ({p(c.debt_service_chg, '+.2f')}pp/yr)"
+        if c.debt_service is not None
+        else "—"
+    )
+    if c.claims is not None:
+        chg_k = c.claims_chg / 1000 if c.claims_chg is not None else None
+        claims = f"{c.claims / 1000:.0f}k ({p(chg_k, '+.0f')}k/qtr)"
+    else:
+        claims = "—"
+    out.append(f"  debt service   : {ds}   initial claims {claims}")
     health = f"FRED {c.resolved}/{c.total} live"
     if c.stale:
         health += f", stale {','.join(c.stale)}"
     out.append(
-        f"  read: spend>income + low savings = the consumer-funded leg of AI is stretched; "
-        f"ad-rev growth is the real-time tell.  [{health}]"
+        "  read: spend>income + low savings + rising debt-service = the consumer-funded leg is "
+        "stretched (ad-rev growth = real-time tell). The bridge to Clock B: bottom-half "
+        "delinquency → climbing into prime → initial claims turning up (labor migration) → "
+        f"HY OAS widening (regime panel) = the credit trigger releasing.  [{health}]"
     )
     return out
 
 
-def _memory_block(m: macro.MemoryPrices | None) -> list[str]:
-    if m is None:
+def _labor_block(lab: macro.Labor) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1f") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    ur = f"{lab.unrate:.1f}% ({p(lab.unrate_chg, '+.1f')}pp/yr)" if lab.unrate is not None else "—"
+    sahm = f"{lab.sahm:.2f}" if lab.sahm is not None else "—"
+    pm = f"{lab.payrolls_mom:+,.0f}k" if lab.payrolls_mom is not None else "—"
+    op = f"{lab.openings:,.0f}k" if lab.openings is not None else "—"
+    q = f"{lab.quits:.1f}%" if lab.quits is not None else "—"
+    tech = f"{lab.tech_yoy:+.1%}" if lab.tech_yoy is not None else "—"
+    out = [
+        f"  unemployment : {ur}   Sahm rule {sahm} [{lab.band}]  (>=0.50 = recession trigger)",
+        f"  payrolls     : {pm}/mo   openings {op}   quits {q} (low = workers not confident)",
+        f"  tech jobs    : computer-systems-design {tech} YoY  — the AI-substitution tell",
+        "  read: jobs = the consumer income engine (Clock A) + where AI substitution shows up "
+        "first. Sahm rising / tech-jobs rolling = the K-shape biting labor → consumer → credit.",
+    ]
+    if lab.stale:
+        out.append(f"  [stale: {','.join(lab.stale)}]")
+    return out
+
+
+def _makers_block(m: macro.Makers) -> list[str]:
+    if m.n == 0:
+        return ["  makers: n/a"]
+    avg = f"{m.avg_offhi:+.1%}" if m.avg_offhi is not None else "—"
+    names = "  ".join(f"{t.split('.')[0]} {o:+.0%}" for t, o, _ in m.names)
+    return [
+        f"  bottleneck     : avg {avg} off-hi (n={m.n})  — deep-moat supply leaders",
+        f"  names          : {names}",
+        "  read: memory/packaging/litho/power oligopoly (Samsung/Hynix/TSMC/ASML/Infineon/MU). "
+        "Price-maker on margin, price-taker on demand — leveraged to capex. `macro makers` = full.",
+    ]
+
+
+def _distribution_block(d: macro.Distribution) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    ls = f"{d.labor_share:.1f}" if d.labor_share is not None else "—"
+    verdict = "→ to CAPITAL (demand base capped)" if d.to_capital else "→ shared / inconclusive"
+    out = [
+        f"  productivity   : {p(d.productivity_yoy)} YoY (output/hr) — the real boom",
+        f"  real pay       : {p(d.real_comp_yoy)} YoY (real comp/hr) — labor's cut",
+        f"  wedge          : {p(d.gap)} (productivity minus pay)  {verdict}",
+        f"  labor share    : {ls} (2017=100), {p(d.labor_share_yoy)} YoY  "
+        "— falling = gains to capital",
+        f"  corp profits   : {p(d.profits_yoy)} YoY — capital's cut",
+        "  read: a boom only ROIs if gains reach the demand base. K-shape slows Clock A (ROI) "
+        "by income-capping consumers; pairs with consumer_health (base) + crypto_credit (Clock B).",
+    ]
+    if d.stale:
+        out.append(f"  [stale: {','.join(d.stale)}]")
+    return out
+
+
+def _memory_block(
+    m: macro.MemoryPrices | None, tape: macro.MemoryTape | None = None
+) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    if m is None and (tape is None or tape.ewy is None):
         return ["  memory: n/a (add memory_prices.json — see memory_prices.example.json)"]
     out: list[str] = []
+    if tape is not None and tape.ewy is not None:
+        out.append(
+            f"  maker tape     : EWY {tape.ewy:.2f}  {p(tape.d1)}/1d  {p(tape.d5)}/5d  "
+            f"{p(tape.off_hi)} off-hi  — Samsung/SK Hynix proxy (live; leads the print)"
+        )
+    if m is None:
+        return out
     if m.fc_3q:
         cons = (
             f" vs consensus +{m.consensus_3q[0]:.0f}-{m.consensus_3q[1]:.0f}%"
@@ -382,6 +572,42 @@ def _ai_demand_block(d: AiDemand | None) -> list[str]:
         "falling = intelligence commoditizing, volume must outrun it.",
         "  token VOLUME (the demand numerator) isn't here — needs an API key / manual rankings.",
     ]
+
+
+def _roi_coverage_block(r: macro.RoiCoverage | None) -> list[str]:
+    if r is None:
+        return ["  roi coverage: n/a (add roi_coverage.json — see roi_coverage.example.json)"]
+
+    def p(x: float | None, fmt: str = "+.0%") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    labs = ", ".join(f"{n} ${a:.0f}B" for n, a in r.labs) or "—"
+    arr = f"${r.total_arr:.0f}B" if r.total_arr is not None else "—"
+    cap = f"${r.capex:.0f}B" if r.capex is not None else "—"
+    cov = f"{r.coverage:.0%}" if r.coverage is not None else "—"
+    exo = f"{r.exo_coverage:.0%}" if r.exo_coverage is not None else "—"
+    circ = f"{r.circular_pct:.0%}" if r.circular_pct is not None else "—"
+    if r.closing is True:
+        race = "ARR outgrowing capex → Clock A closing the gap (on paper)"
+    elif r.closing is False:
+        race = "capex outgrowing ARR → ROI gap WIDENING (supply ahead of paid demand)"
+    else:
+        race = "growth read incomplete"
+    out = [
+        f"  lab ARR        : {arr} ({labs})  growth {p(r.arr_growth)}",
+        f"  vs capex       : {cap}/yr  growth {p(r.capex_growth)}",
+        f"  coverage       : {cov} of capex  (exogenous {exo}, ~{circ} circular)",
+    ]
+    if r.vol_growth is not None:
+        out.append(
+            f"  token volume   : {p(r.vol_growth)} (Jevons numerator — must outrun price fall)"
+        )
+    out.append(
+        f"  read: {race}. Coverage = headline; exogenous-vs-circular = honesty check "
+        "(circular = NVDA→OpenAI→Azure→NVDA, inflates ARR without anchoring it). "
+        f"asof {r.asof}."
+    )
+    return out
 
 
 # ---------- delta snapshots (atlas-brief idea: a "what changed" lede) ----------
@@ -552,9 +778,20 @@ def build_brief(
     breadth = macro.spx_breadth()
     cta = macro.cta()
     cc = macro.crypto_credit()
+    creds = macro.credit_stress()
+    privc = macro.private_credit()
+    nclo = macro.neocloud()
+    funding = macro.funding_stress()
     mem = macro.memory_prices()
+    memtape = macro.memory_tape()
     cons = macro.consumer_health()
+    lab = macro.labor()
+    dist = macro.distribution()
+    mkrs = macro.makers()
+    froth = macro.retail_froth()
+    attn = macro.retail_attention()
     aid = ai_demand()
+    roi = macro.roi_coverage()
 
     # delta snapshot: load yesterday's state, compute "what changed", persist today's
     today = date.today()
@@ -581,6 +818,14 @@ def build_brief(
         "```",
         *_consumer_block(cons),
         "```",
+        "## Labor (jobs — Clock A income engine + AI-substitution tell)",
+        "```",
+        *_labor_block(lab),
+        "```",
+        "## Distribution (who gets the productivity gains)",
+        "```",
+        *_distribution_block(dist),
+        "```",
         "## Sentiment & valuation",
         "```",
         *_fear_greed_block(fg),
@@ -599,17 +844,49 @@ def build_brief(
         "```",
         *_crypto_credit_block(cc),
         "```",
+        "## Credit stress (Clock B — quality ladder + levered edge)",
+        "```",
+        *_credit_stress_block(creds),
+        "```",
+        "## Private credit (Clock B — shadow-bank / AI-infra-debt edge)",
+        "```",
+        *_private_credit_block(privc),
+        "```",
+        "## Neocloud watch (Clock B — the levered GPU-cloud operators)",
+        "```",
+        *_neocloud_block(nclo),
+        "```",
+        "## Funding plumbing (Clock B — repo / liquidity)",
+        "```",
+        *_funding_stress_block(funding),
+        "```",
         "## AI-infra demand (commoditization)",
         "```",
         *_ai_demand_block(aid),
         "```",
+        "## AI ROI coverage (revenue vs capex — Clock A)",
+        "```",
+        *_roi_coverage_block(roi),
+        "```",
         "## Memory super-cycle (price-hike tracker)",
         "```",
-        *_memory_block(mem),
+        *_memory_block(mem, memtape),
+        "```",
+        "## Bottleneck makers (deep-moat supply leaders)",
+        "```",
+        *_makers_block(mkrs),
         "```",
         "## Mag7 — concentration",
         "```",
         *_mag7_block(m7),
+        "```",
+        "## Retail froth (the payload size, not the fuse)",
+        "```",
+        *_retail_froth_block(froth),
+        "```",
+        "## Retail attention (search + social — who's showing up)",
+        "```",
+        *_retail_attention_block(attn),
         "```",
         "## Book — focus (active theses)",
         "```",

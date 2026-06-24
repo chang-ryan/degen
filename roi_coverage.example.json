@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to roi_coverage.json (gitignored). The Clock-A numerator the free feeds can't see: lab ARR run-rates + aggregate hyperscaler AI capex. degen.macro.roi_coverage() computes coverage (ARR/capex) and the honesty check (exogenous vs circular). Update arr_b/capex from prints (earnings, press); set circular_pct to your estimate of AI-internal/vendor-financed demand (NVDA->OpenAI->Azure->NVDA) that inflates ARR without anchoring it. token_volume is the optional Jevons numerator (any consistent index) — falling token price only helps if volume outruns it.",
+  "asof": "YYYY-MM-DD",
+  "capex": {"annual_b": 0, "prior_annual_b": 0, "source": "aggregate Mag7 AI capex run-rate (guides)"},
+  "labs": [
+    {"name": "OpenAI", "arr_b": 0, "prior_arr_b": 0, "source": "press/earnings"},
+    {"name": "Anthropic", "arr_b": 0, "prior_arr_b": 0, "source": "press/earnings"}
+  ],
+  "circular_pct": null,
+  "token_volume": {"idx": null, "prior_idx": null, "note": "optional demand-numerator proxy (tokens/day index)"},
+  "note": "what the numbers say / what to refine next"
+}

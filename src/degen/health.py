@@ -46,6 +46,23 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         c = macro.consumer_health()
         return f"{c.resolved}/{c.total} live, gap {c.gap:+.1%}" if c.gap is not None else "no gap"
 
+    def labor() -> str:
+        lab = macro.labor()
+        s = f"{lab.sahm:.2f}" if lab.sahm is not None else "—"
+        return f"U {lab.unrate:.1f}%, Sahm {s} [{lab.band}]" if lab.unrate is not None else "n/a"
+
+    def makers() -> str:
+        m = macro.makers()
+        a = f"{m.avg_offhi:+.0%}" if m.avg_offhi is not None else "—"
+        return f"{m.n} live, avg {a} off-hi" if m.n else "n/a"
+
+    def distribution() -> str:
+        d = macro.distribution()
+        if d.gap is None:
+            return "no gap"
+        tag = "to-capital" if d.to_capital else "shared"
+        return f"wedge {d.gap:+.1%} [{tag}], labor share {d.labor_share:.1f}"
+
     def fng() -> str:
         fg = macro.fear_greed()
         return f"{fg.score:.0f} ({fg.rating})" if fg else "n/a (blocked)"
@@ -53,6 +70,26 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
     def crypto() -> str:
         cc = macro.crypto_credit()
         return f"STRC {cc.strc:.1f} [{cc.band}]" if cc.strc is not None else "n/a"
+
+    def credit() -> str:
+        cs = macro.credit_stress()
+        d = f"{cs.dispersion:.1f}pp" if cs.dispersion is not None else "—"
+        return f"CCC {cs.ccc_oas:.1f}% disp {d} [{cs.band}]" if cs.ccc_oas is not None else "n/a"
+
+    def funding() -> str:
+        f = macro.funding_stress()
+        si = f"{f.sofr_iorb * 100:+.0f}bp" if f.sofr_iorb is not None else "—"
+        return f"SOFR-IORB {si}, RRP ${f.rrp:,.0f}B [{f.band}]" if f.sofr is not None else "n/a"
+
+    def privcred() -> str:
+        pc = macro.private_credit()
+        inf = f"{pc.infra_offhi:+.0%}" if pc.infra_offhi is not None else "—"
+        return f"PC {pc.pc_offhi:+.0%}, build-debt {inf} [{pc.band}]" if pc.pc_n else "n/a"
+
+    def neoclouds() -> str:
+        nc = macro.neocloud()
+        a = f"{nc.avg_offhi:+.0%}" if nc.avg_offhi is not None else "—"
+        return f"avg {a} off-hi, {nc.n_cracking}/{nc.n} cracking [{nc.band}]" if nc.n else "n/a"
 
     def ai() -> str:
         d = ai_demand.ai_demand()
@@ -83,9 +120,16 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         ("yfinance — cross-asset", cross),
         ("FRED — regime series", fred_regime),
         ("FRED — consumer series", consumer),
+        ("FRED — labor (Sahm/JOLTS)", labor),
+        ("makers (foreign tickers)", makers),
+        ("FRED — distribution series", distribution),
         ("CNN — Fear & Greed", fng),
         ("OpenRouter — ai_demand", ai),
         ("crypto-credit (STRC/MSTR)", crypto),
+        ("credit stress (ladder/edge)", credit),
+        ("funding plumbing (repo/RRP)", funding),
+        ("private credit (BDC/infra)", privcred),
+        ("neocloud watch (operators)", neoclouds),
         ("Wikipedia — SPX list", spx),
         ("SEC EDGAR — resolve", edgar_resolve),
         ("X syndication — fetch", xpost),
