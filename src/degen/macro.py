@@ -128,6 +128,22 @@ def _close(ticker: str, period: str = "1y") -> pd.Series:
     return h["Close"].dropna()
 
 
+def _market_offhi() -> float | None:
+    """SPY's own off-63d-high — the beta baseline netted out of the basket gauges (#1).
+
+    Every basket gauge (neocloud, private_credit, makers, the credit levered edge) is
+    'avg % off 63d high', which is dominated by market beta: in a selloff they all
+    flash together and *look* like N independent Clock-B cracks when it's really one
+    factor. Subtracting this isolates the idiosyncratic (excess) stress — a basket
+    down only as much as SPY is NOT a confirmation; down more than SPY is.
+    """
+    try:
+        s = _close("SPY", "6mo").dropna()
+        return float(s.iloc[-1] / s.tail(63).max() - 1)
+    except Exception:
+        return None
+
+
 def _pctile(s: pd.Series, window: int = PCTILE_WINDOW) -> tuple[float, float]:
     """(current value, its percentile within the trailing window)."""
     tail = s.tail(window)
@@ -255,10 +271,25 @@ def _curve_note() -> str:
         return "n/a"
 
 
-def _verdict(stress_count: int, available: int) -> str:
+# The verdict weights signals so correlated ones can't gang up (#2). The rate/vol
+# trio (ratevol, equityvol, realrates) is largely ONE factor — a single bond-market
+# move can fire all three — so each gets 0.5 (≈1.5 together, not 3.0). Credit is the
+# canary the whole module is built around, so it outweighs the trio on its own.
+_SIGNAL_WEIGHTS = {
+    "credit": 2.0,  # the cleanest forced-selling canary
+    "conditions": 1.5,  # NFCI composite (independent of the vol trio)
+    "breadth": 1.0,
+    "ratevol": 0.5,
+    "equityvol": 0.5,
+    "realrates": 0.5,
+}
+
+
+def _verdict(stress: float, available: float) -> str:
+    """Weighted stress fraction → regime. Inputs are summed signal *weights*, not counts."""
     if available == 0:
         return "no data"
-    frac = stress_count / available
+    frac = stress / available
     if frac <= 0.20:
         return "risk-on"
     if frac <= 0.50:
@@ -284,11 +315,13 @@ def build() -> Regime:
                 )
             )
     available = [s for s in signals if s.available]
-    stress_count = sum(1 for s in available if s.stress)
+    stress_count = sum(1 for s in available if s.stress)  # raw count, for display honesty
+    w_avail = sum(_SIGNAL_WEIGHTS.get(s.key, 1.0) for s in available)
+    w_stress = sum(_SIGNAL_WEIGHTS.get(s.key, 1.0) for s in available if s.stress)
     return Regime(
         asof=date.today().isoformat(),
         signals=tuple(signals),
-        verdict=_verdict(stress_count, len(available)),
+        verdict=_verdict(w_stress, w_avail),  # weighted, so credit/conditions lead
         stress_count=stress_count,
         available_count=len(available),
         curve_note=_curve_note(),
@@ -655,12 +688,12 @@ def memory_prices() -> MemoryPrices | None:
         return None
 
 
-# ---------- memory maker tape (live proxy for the contract-price gauge) ----------
-# memory_prices() is hand-entered and lags (contract prints come quarterly). EWY
-# (iShares MSCI South Korea) is ~25% Samsung + ~10% SK Hynix — the global memory
-# duopoly — so its tape is a free, daily, *leading* read on the same complex, and
-# doubles as the Korea/Asia risk canary (KOSPI led the early-June momo unwind).
-# Rolling while contract prints stay strong = the equity market front-running a top.
+# ---------- Korea-beta canary (memory tilt — NOT the memory duopoly) ----------
+# HONEST SCOPE: EWY (iShares MSCI South Korea) is a BROAD Korea fund (banks, autos,
+# Samsung ~20-25%, SK Hynix ~5-8%) — so this tape is a Korea-beta/risk canary with a
+# memory TILT, not a clean memory read. For direct memory exposure use makers()
+# (005930.KS / 000660.KS). Kept because Korea (KOSPI) led the early-June momo unwind,
+# so it's a useful Asia-risk tape that happens to lean memory; read it as such.
 
 
 @dataclass(frozen=True, slots=True)
@@ -673,7 +706,7 @@ class MemoryTape:
 
 
 def memory_tape() -> MemoryTape:
-    """Live memory-duopoly tape via EWY (Samsung/SK Hynix proxy) — leads the prints."""
+    """Korea-beta canary via EWY (broad Korea, memory tilt — direct makers in makers())."""
     try:
         s = _close("EWY", "6mo").dropna()
         return MemoryTape(
@@ -687,12 +720,14 @@ def memory_tape() -> MemoryTape:
         return MemoryTape(None, None, None, None, None)
 
 
-# ---------- bottleneck makers (the deep-moat supply leaders — supply-side watch) ----------
-# The other side of the AI-infra stack: the oligopoly leaders at the binding
-# constraints (memory HBM, CoWoS packaging, EUV litho, power semis). Deep moats,
-# but "price-maker on margin, price-taker on demand" — leveraged to capex like
-# everything else. Foreign-listed where there's no clean US line (Samsung/Hynix on
-# .KS in local currency; off-high/5d is currency-neutral). `macro makers` = full table.
+# ---------- semicap & memory complex (equity-beta health of the supply oligopoly) ----------
+# The supply side of the AI-infra stack: the oligopoly leaders at the binding
+# constraints (memory HBM, CoWoS packaging, EUV litho, power semis). HONEST SCOPE:
+# this measures their *stock drawdown* (equity beta), NOT supply tightness/pricing
+# power — it can't see CoWoS lead times or HBM allocation (no free feed). So it's a
+# complex-health read, de-beta'd vs SPY; the bottleneck-tightness it's named for
+# would need a hand-entered gauge. Foreign-listed where there's no clean US line
+# (Samsung/Hynix on .KS in local currency; off-high/5d is currency-neutral).
 _MAKERS = {
     "MU": "Micron — US memory pure-play (HBM/DRAM/NAND)",
     "005930.KS": "Samsung — HBM/DRAM/NAND + foundry (KRW)",
@@ -710,10 +745,18 @@ class Makers:
     avg_5d: float | None
     n: int
     names: tuple[tuple[str, float, float | None], ...]  # (ticker, off-hi, 5d), worst-first
+    market_offhi: float | None = None  # SPY off-63d-high — for the de-beta'd excess (#1)
+
+    @property
+    def excess_offhi(self) -> float | None:
+        """Complex drawdown beyond the market's — the idiosyncratic (de-beta'd) read."""
+        if self.avg_offhi is None or self.market_offhi is None:
+            return None
+        return self.avg_offhi - self.market_offhi
 
 
 def makers() -> Makers:
-    """The deep-moat supply leaders (memory/packaging/litho/power) — supply-side watch."""
+    """The semicap/memory supply oligopoly — equity-beta health (de-beta'd vs SPY)."""
     rows: list[tuple[str, float, float | None]] = []
     for t in _MAKERS:
         try:
@@ -731,6 +774,7 @@ def makers() -> Makers:
         avg_5d=(sum(d5s) / len(d5s)) if d5s else None,
         n=len(rows),
         names=tuple(rows),
+        market_offhi=_market_offhi(),
     )
 
 
@@ -762,10 +806,20 @@ class RoiCoverage:
 
     @property
     def closing(self) -> bool | None:
-        """Is the ROI gap narrowing? ARR growing faster than capex = Clock A catching up."""
+        """Is the coverage *ratio* rising? ARR outgrowing capex = Clock A catching up.
+
+        Mathematically correct for ratio direction, but DELIBERATELY magnitude-blind:
+        0.135 -> 0.140 reads True while the gap is still a chasm. Always read it next
+        to `coverage` and `gap_x` — direction without distance is falsely reassuring.
+        """
         if self.arr_growth is None or self.capex_growth is None:
             return None
         return self.arr_growth > self.capex_growth
+
+    @property
+    def gap_x(self) -> float | None:
+        """Distance to 1.0x coverage (1 - coverage); how far paid demand is from funding capex."""
+        return (1.0 - self.coverage) if self.coverage is not None else None
 
 
 def roi_coverage() -> RoiCoverage | None:
@@ -935,6 +989,7 @@ class CreditStress:
     loans_offhi: float | None  # BKLN (leveraged loans)
     banks_offhi: float | None  # KRE (regional banks)
     stale: tuple[str, ...]
+    market_offhi: float | None = None  # SPY off-63d-high — netted out of the equity edges (#1)
 
     @property
     def dispersion(self) -> float | None:
@@ -943,18 +998,24 @@ class CreditStress:
             return None
         return self.ccc_oas - self.ig_oas
 
+    def _excess(self, offhi: float | None) -> float | None:
+        """An equity edge's drawdown beyond the market's — strips beta so a broad
+        selloff doesn't masquerade as bank/private-credit-specific stress."""
+        if offhi is None:
+            return None
+        return offhi - self.market_offhi if self.market_offhi is not None else offhi
+
     @property
     def band(self) -> str:
-        # systemic: stress reached quality (IG) or the banking system (KRE)
+        banks_ex, bdc_ex = self._excess(self.banks_offhi), self._excess(self.bdc_offhi)
+        # systemic: stress reached quality (IG, spread-based) or the banks (KRE, de-beta'd)
         if (self.ig_oas is not None and self.ig_oas > 1.0) or (
-            self.banks_offhi is not None and self.banks_offhi < -0.08
+            banks_ex is not None and banks_ex < -0.08
         ):
             return "spreading (quality/banks)"
-        # bottom-edge leak: private credit or the CCC tier cracking while the top is calm
+        # bottom-edge leak: private credit (de-beta'd) or the CCC tier while the top is calm
         disp = self.dispersion
-        if (self.bdc_offhi is not None and self.bdc_offhi < -0.05) or (
-            disp is not None and disp > 7
-        ):
+        if (bdc_ex is not None and bdc_ex < -0.05) or (disp is not None and disp > 7):
             return "leaking (bottom edge)"
         return "calm"
 
@@ -998,6 +1059,7 @@ def credit_stress() -> CreditStress:
         loans_offhi=loans_offhi,
         banks_offhi=banks_offhi,
         stale=tuple(stale),
+        market_offhi=_market_offhi(),
     )
 
 
@@ -1065,13 +1127,15 @@ def funding_stress() -> FundingStress:
     )
 
 
-# ---------- private credit (Clock B — the on-thesis shadow-bank / AI-infra-debt edge) ----------
+# ---------- private credit (Clock B — shadow-bank equity proxy, de-beta'd) ----------
 # The free *approximation* of the bomb the thesis keeps naming: the cleanest signals
-# (CDS, CLO spreads, BDC NAV discounts) are paywalled, so we proxy with equities.
-# Two baskets: (1) the private-credit complex — direct-lending BDCs + the PC-heavy
-# alt managers (Ares/Blue Owl); rolling off-highs ≈ discounts widening. (2) the
-# AI-infra-debt edge — neoclouds + debt-funded datacenter builds (CRWV/ORCL/VRT).
-# Equity-noisy, so read it as confirmation of the spread/funding leaks, not alone.
+# (CDS, CLO spreads, BDC NAV discounts) are paywalled, so we proxy with equities,
+# de-beta'd vs SPY (#1). Two baskets: (1) the private-credit complex — direct-lending
+# BDCs + PC-heavy alt managers (Ares/Blue Owl); excess off-highs ≈ discounts widening.
+# (2) the AI-infra EQUITY edge — ORCL/VRT/DLR. HONEST SCOPE: ORCL especially is a
+# tech-MULTIPLE move, not a debt-stress read — its stock off-high says tech derated,
+# not that its datacenter bonds are wobbling. Confirmation of the spread/funding
+# leaks, never a standalone trigger.
 
 _PC_COMPLEX = ("ARCC", "BXSL", "FSK", "BIZD", "OBDC", "ARES", "OWL")  # BDCs + PC sponsors
 _INFRA_DEBT = ("ORCL", "VRT", "DLR")  # debt-funded build: Oracle + power/datacenter REIT
@@ -1083,18 +1147,36 @@ class PrivateCredit:
     pc_5d: float | None
     pc_n: int
     pc_worst: tuple[str, float] | None  # most-stressed single name (ticker, off-hi)
-    infra_offhi: float | None  # avg off-high, AI-infra-debt edge
+    infra_offhi: float | None  # avg off-high, AI-infra equity edge (ORCL/VRT/DLR)
     infra_5d: float | None
     infra_n: int
     infra_worst: tuple[str, float] | None
+    market_offhi: float | None = None  # SPY off-63d-high — for the de-beta'd excess (#1)
+
+    @property
+    def pc_excess(self) -> float | None:
+        if self.pc_offhi is None or self.market_offhi is None:
+            return None
+        return self.pc_offhi - self.market_offhi
+
+    @property
+    def infra_excess(self) -> float | None:
+        if self.infra_offhi is None or self.market_offhi is None:
+            return None
+        return self.infra_offhi - self.market_offhi
 
     @property
     def band(self) -> str:
-        vals = [v for v in (self.pc_offhi, self.infra_offhi) if v is not None]
-        worst = min(vals) if vals else 0.0
-        if worst <= -0.15:
+        # prefer the de-beta'd excess; fall back to absolute off-high if no SPY baseline
+        ex = [v for v in (self.pc_excess, self.infra_excess) if v is not None]
+        if ex:
+            worst, crack, stress = min(ex), -0.10, -0.05
+        else:
+            raw = [v for v in (self.pc_offhi, self.infra_offhi) if v is not None]
+            worst, crack, stress = (min(raw) if raw else 0.0), -0.15, -0.07
+        if worst <= crack:
             return "cracking"
-        if worst <= -0.07:
+        if worst <= stress:
             return "stressed"
         return "calm"
 
@@ -1133,6 +1215,7 @@ def private_credit() -> PrivateCredit:
         infra_5d=inf_5d,
         infra_n=inf_n,
         infra_worst=inf_worst,
+        market_offhi=_market_offhi(),
     )
 
 
@@ -1162,14 +1245,26 @@ class Neocloud:
     n: int
     n_cracking: int  # how many are >15% off their high
     names: tuple[tuple[str, float, float | None], ...]  # (ticker, off-hi, 5d), worst-first
+    market_offhi: float | None = None  # SPY off-63d-high — netted out for the band (#1)
+
+    @property
+    def excess_offhi(self) -> float | None:
+        """Basket drawdown beyond the market's — the idiosyncratic Clock-B stress."""
+        if self.avg_offhi is None or self.market_offhi is None:
+            return None
+        return self.avg_offhi - self.market_offhi
 
     @property
     def band(self) -> str:
-        if self.avg_offhi is None:
+        # prefer the de-beta'd excess; tighter thresholds than the absolute fallback
+        ex = self.excess_offhi
+        v = ex if ex is not None else self.avg_offhi
+        if v is None:
             return "n/a"
-        if self.avg_offhi <= -0.15:
+        crack, stress = (-0.10, -0.05) if ex is not None else (-0.15, -0.07)
+        if v <= crack:
             return "cracking"
-        if self.avg_offhi <= -0.07:
+        if v <= stress:
             return "stressed"
         return "calm"
 
@@ -1194,6 +1289,7 @@ def neocloud() -> Neocloud:
         n=len(rows),
         n_cracking=sum(1 for o in offs if o <= -0.15),
         names=tuple(rows),
+        market_offhi=_market_offhi(),
     )
 
 
@@ -1375,10 +1471,12 @@ def distribution() -> Distribution:
 
 # ---------- labor (jobs — the consumer's income engine + the AI-substitution tell) ----------
 # Jobs are where two threads meet: (1) the consumer demand base (Clock A) runs on
-# wage income, so a softening labor market erodes it; (2) AI substitution, if real,
-# shows up here first as tech layoffs. The Sahm rule is the cleanest recession
-# trigger (unemployment momentum); JOLTS quits = worker confidence; tech-sector
-# employment YoY = the AI-substitution tell. All free FRED.
+# wage income, so a softening labor market erodes it; (2) tech hiring, where an AI
+# substitution effect would eventually surface. The Sahm rule is the cleanest
+# recession trigger (unemployment momentum); JOLTS quits = worker confidence.
+# HONEST SCOPE on "tech": CES6054150001 is computer-systems-DESIGN-and-services
+# employment (IT services/consulting), so a decline is a substitution *hint* at
+# best — indistinguishable from offshoring or a plain tech-capex slowdown. Free FRED.
 _LABOR_SERIES = {
     "unrate": ("UNRATE", 12),  # unemployment rate, %
     "payems": ("PAYEMS", 1),  # nonfarm payrolls level (MoM diff = job adds)
@@ -1398,7 +1496,7 @@ class Labor:
     quits: float | None  # quits rate, %
     openings: float | None  # job openings, thousands
     sahm: float | None  # Sahm-rule value (triggers recession call at >=0.5)
-    tech_yoy: float | None  # tech-sector employment YoY (AI-substitution tell)
+    tech_yoy: float | None  # IT-services employment YoY (substitution *hint*, not proof)
     continued_claims: float | None  # level
     stale: tuple[str, ...]
 
@@ -1482,6 +1580,14 @@ class RetailFroth:
     casino_5d: float | None  # avg 5d of the levered single-stock ETF basket
     casino_offhi: float | None  # avg off-63d-high (deeply negative = casino unwinding)
     casino_n: int  # how many levered ETFs resolved
+    market_offhi: float | None = None  # SPY off-63d-high — for the de-beta'd excess (#1)
+
+    @property
+    def casino_excess(self) -> float | None:
+        """Casino drawdown beyond the market's — spec-crowd damage stripped of beta."""
+        if self.casino_offhi is None or self.market_offhi is None:
+            return None
+        return self.casino_offhi - self.market_offhi
 
 
 def _ratio_read(num: str, den: str) -> tuple[float | None, float | None]:
@@ -1524,6 +1630,7 @@ def retail_froth() -> RetailFroth:
         casino_5d=(sum(d5s) / len(d5s)) if d5s else None,
         casino_offhi=(sum(offhis) / len(offhis)) if offhis else None,
         casino_n=len(offhis),
+        market_offhi=_market_offhi(),
     )
 
 
@@ -1663,7 +1770,8 @@ def main() -> None:
     if "makers" in sys.argv[1:]:
         m = makers()
         avg = f"{m.avg_offhi:+.1%}" if m.avg_offhi is not None else "—"
-        print(f"=== bottleneck makers  avg {avg} off-hi (n={m.n}) ===")
+        ex = f"  excess {m.excess_offhi:+.1%} vs SPY" if m.excess_offhi is not None else ""
+        print(f"=== semicap & memory complex  avg {avg} off-hi (n={m.n}){ex} ===")
         for t, off, d5 in m.names:
             d5s = f"{d5:+6.1%}" if d5 is not None else "   —  "
             print(f"  {t:11} off-hi {off:+6.1%}  5d {d5s}   {_MAKERS.get(t, '')}")
@@ -1671,7 +1779,8 @@ def main() -> None:
     if "neocloud" in sys.argv[1:]:
         nc = neocloud()
         avg = f"{nc.avg_offhi:+.1%}" if nc.avg_offhi is not None else "—"
-        print(f"=== neocloud [{nc.band}] avg {avg} off-hi · {nc.n_cracking}/{nc.n} cracking ===")
+        ex = f" (excess {nc.excess_offhi:+.1%} vs SPY)" if nc.excess_offhi is not None else ""
+        print(f"=== neocloud [{nc.band}] avg {avg} off-hi{ex} · {nc.n_cracking}/{nc.n} crack ===")
         for t, off, d5 in nc.names:
             d5s = f"{d5:+6.1%}" if d5 is not None else "   —  "
             print(f"  {t:5} off-hi {off:+6.1%}  5d {d5s}   {_NEOCLOUDS.get(t, '')}")

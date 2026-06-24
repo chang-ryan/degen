@@ -348,8 +348,9 @@ def _retail_froth_block(r: macro.RetailFroth) -> list[str]:
         f"  margin debt    : {md}  — leverage piling in (>~25% YoY = late-cycle)",
         f"  high-beta      : SPHB/SPLV {p(r.high_beta_offhi)} off-hi, {p(r.high_beta_5d)}/5d  "
         "— speculative appetite",
-        f"  casino (2x ETF): avg {p(r.casino_5d)}/5d, avg {p(r.casino_offhi)} off-hi  "
-        "— MSTU/NVDL/TSLL (cratering = spec crowd wrecked)",
+        f"  casino (2x ETF): avg {p(r.casino_5d)}/5d, avg {p(r.casino_offhi)} off-hi"
+        f"{f' ({p(r.casino_excess)} vs SPY)' if r.casino_excess is not None else ''}  "
+        "— MSTU/NVDL/TSLL (cratering vs SPY = spec crowd wrecked)",
         "  read: the payload size, not the fuse — froth amplifies the move; credit + ROI "
         "trigger the break. Pair with the F&G put/call sub.",
     ]
@@ -370,8 +371,8 @@ def _credit_stress_block(c: macro.CreditStress) -> list[str]:
         f"  dispersion     : CCC-IG {disp}  [{c.band}]  (wide = stress stuck at the bottom)",
         f"  levered edge   : private-credit/BDC {p(c.bdc_offhi)} off-hi ({p(c.bdc_5d)}/5d) · "
         f"loans {p(c.loans_offhi)} · banks {p(c.banks_offhi)} off-hi",
-        "  read: CCC + private credit cracking while IG/banks calm = early/confined. IG "
-        "widening or banks breaking = stress reaching quality (systemic). Pairs w/ crypto_credit.",
+        "  read: CCC + private credit cracking while IG/banks calm = early/confined. IG widening "
+        "or banks breaking = systemic. Equity edges (BDC/banks) are de-beta'd vs SPY in the band.",
     ]
     if c.stale:
         out.append(f"  [stale: {','.join(c.stale)}]")
@@ -385,13 +386,15 @@ def _private_credit_block(pc: macro.PrivateCredit) -> list[str]:
     def worst(w: tuple[str, float] | None) -> str:
         return f"worst {w[0]} {w[1]:+.0%}" if w else ""
 
+    pcx = f", {p(pc.pc_excess)} vs SPY" if pc.pc_excess is not None else ""
+    infx = f", {p(pc.infra_excess)} vs SPY" if pc.infra_excess is not None else ""
     return [
-        f"  private credit : {p(pc.pc_offhi)} off-hi ({p(pc.pc_5d)}/5d, n={pc.pc_n})  "
+        f"  private credit : {p(pc.pc_offhi)} off-hi{pcx} ({p(pc.pc_5d)}/5d, n={pc.pc_n})  "
         f"{worst(pc.pc_worst)}  — BDCs + Ares/Blue Owl",
-        f"  build debt     : {p(pc.infra_offhi)} off-hi ({p(pc.infra_5d)}/5d, n={pc.infra_n})  "
-        f"{worst(pc.infra_worst)}  — Oracle/datacenter (ORCL/VRT/DLR); neoclouds → own panel",
-        f"  read: [{pc.band}] equity proxy for the shadow-bank/AI-infra-debt bomb (CDS/CLO/NAV "
-        "are paywalled). Confirms credit_stress; not a standalone trigger.",
+        f"  infra equity   : {p(pc.infra_offhi)} off-hi{infx} ({p(pc.infra_5d)}/5d, n={pc.infra_n})"
+        f"  {worst(pc.infra_worst)}  — ORCL/VRT/DLR (tech beta, NOT debt stress)",
+        f"  read: [{pc.band}] de-beta'd equity proxy for the shadow-bank bomb (CDS/CLO/NAV are "
+        "paywalled). Confirms credit_stress/funding; never a standalone trigger.",
     ]
 
 
@@ -399,12 +402,13 @@ def _neocloud_block(nc: macro.Neocloud) -> list[str]:
     if nc.n == 0:
         return ["  neocloud: n/a"]
     avg = f"{nc.avg_offhi:+.1%}" if nc.avg_offhi is not None else "—"
+    ex = f", {nc.excess_offhi:+.1%} vs SPY" if nc.excess_offhi is not None else ""
     worst = "  ".join(f"{t} {o:+.0%}" for t, o, _ in nc.names[:4])
     return [
-        f"  neocloud edge  : avg {avg} off-hi ({nc.n_cracking}/{nc.n} cracking >15%)  [{nc.band}]",
+        f"  neocloud edge  : avg {avg} off-hi{ex} ({nc.n_cracking}/{nc.n} >15% off)  [{nc.band}]",
         f"  most-stressed  : {worst}",
         "  read: levered GPU-cloud operators (CRWV/IREN/…) — most faith-dependent corner, cracks "
-        "first. Bifurcation = name-specific, not a complex meltdown yet. `macro neocloud` = full.",
+        "first. Band is de-beta'd (vs SPY); bifurcation = name-specific, not a complex meltdown.",
     ]
 
 
@@ -476,9 +480,10 @@ def _labor_block(lab: macro.Labor) -> list[str]:
     out = [
         f"  unemployment : {ur}   Sahm rule {sahm} [{lab.band}]  (>=0.50 = recession trigger)",
         f"  payrolls     : {pm}/mo   openings {op}   quits {q} (low = workers not confident)",
-        f"  tech jobs    : computer-systems-design {tech} YoY  — the AI-substitution tell",
-        "  read: jobs = the consumer income engine (Clock A) + where AI substitution shows up "
-        "first. Sahm rising / tech-jobs rolling = the K-shape biting labor → consumer → credit.",
+        f"  tech jobs    : IT-services employment {tech} YoY  — substitution *hint* (not proof)",
+        "  read: jobs = the consumer income engine (Clock A). Sahm rising = the K-shape biting "
+        "labor → consumer → credit. Tech line is IT-services (CES6054150001): a falling print is "
+        "indistinguishable from offshoring / a plain tech-capex slowdown — read it as a hint.",
     ]
     if lab.stale:
         out.append(f"  [stale: {','.join(lab.stale)}]")
@@ -489,12 +494,14 @@ def _makers_block(m: macro.Makers) -> list[str]:
     if m.n == 0:
         return ["  makers: n/a"]
     avg = f"{m.avg_offhi:+.1%}" if m.avg_offhi is not None else "—"
+    ex = f", {m.excess_offhi:+.1%} vs SPY" if m.excess_offhi is not None else ""
     names = "  ".join(f"{t.split('.')[0]} {o:+.0%}" for t, o, _ in m.names)
     return [
-        f"  bottleneck     : avg {avg} off-hi (n={m.n})  — deep-moat supply leaders",
+        f"  complex        : avg {avg} off-hi{ex} (n={m.n})  — semicap/memory oligopoly",
         f"  names          : {names}",
         "  read: memory/packaging/litho/power oligopoly (Samsung/Hynix/TSMC/ASML/Infineon/MU). "
-        "Price-maker on margin, price-taker on demand — leveraged to capex. `macro makers` = full.",
+        "This is EQUITY-BETA health (de-beta'd vs SPY), NOT supply tightness — it can't see CoWoS "
+        "lead times / HBM allocation (no free feed). `macro makers` = full.",
     ]
 
 
@@ -530,8 +537,8 @@ def _memory_block(
     out: list[str] = []
     if tape is not None and tape.ewy is not None:
         out.append(
-            f"  maker tape     : EWY {tape.ewy:.2f}  {p(tape.d1)}/1d  {p(tape.d5)}/5d  "
-            f"{p(tape.off_hi)} off-hi  — Samsung/SK Hynix proxy (live; leads the print)"
+            f"  korea tape     : EWY {tape.ewy:.2f}  {p(tape.d1)}/1d  {p(tape.d5)}/5d  "
+            f"{p(tape.off_hi)} off-hi  — broad Korea/memory tilt (direct makers in maker panel)"
         )
     if m is None:
         return out
@@ -593,10 +600,11 @@ def _roi_coverage_block(r: macro.RoiCoverage | None) -> list[str]:
         race = "capex outgrowing ARR → ROI gap WIDENING (supply ahead of paid demand)"
     else:
         race = "growth read incomplete"
+    gapx = f"{r.gap_x:.0%} short of 1.0x" if r.gap_x is not None else "—"
     out = [
         f"  lab ARR        : {arr} ({labs})  growth {p(r.arr_growth)}",
         f"  vs capex       : {cap}/yr  growth {p(r.capex_growth)}",
-        f"  coverage       : {cov} of capex  (exogenous {exo}, ~{circ} circular)",
+        f"  coverage       : {cov} of capex ({gapx})  (exogenous {exo}, ~{circ} circular)",
     ]
     if r.vol_growth is not None:
         out.append(
@@ -818,7 +826,7 @@ def build_brief(
         "```",
         *_consumer_block(cons),
         "```",
-        "## Labor (jobs — Clock A income engine + AI-substitution tell)",
+        "## Labor (jobs — Clock A income engine + tech-hiring hint)",
         "```",
         *_labor_block(lab),
         "```",
@@ -848,7 +856,7 @@ def build_brief(
         "```",
         *_credit_stress_block(creds),
         "```",
-        "## Private credit (Clock B — shadow-bank / AI-infra-debt edge)",
+        "## Private credit (Clock B — shadow-bank equity proxy, de-beta'd)",
         "```",
         *_private_credit_block(privc),
         "```",
@@ -872,7 +880,7 @@ def build_brief(
         "```",
         *_memory_block(mem, memtape),
         "```",
-        "## Bottleneck makers (deep-moat supply leaders)",
+        "## Semicap & memory complex (equity-beta health, de-beta'd)",
         "```",
         *_makers_block(mkrs),
         "```",
