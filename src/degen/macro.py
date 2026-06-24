@@ -687,6 +687,53 @@ def memory_tape() -> MemoryTape:
         return MemoryTape(None, None, None, None, None)
 
 
+# ---------- bottleneck makers (the deep-moat supply leaders — supply-side watch) ----------
+# The other side of the AI-infra stack: the oligopoly leaders at the binding
+# constraints (memory HBM, CoWoS packaging, EUV litho, power semis). Deep moats,
+# but "price-maker on margin, price-taker on demand" — leveraged to capex like
+# everything else. Foreign-listed where there's no clean US line (Samsung/Hynix on
+# .KS in local currency; off-high/5d is currency-neutral). `macro makers` = full table.
+_MAKERS = {
+    "MU": "Micron — US memory pure-play (HBM/DRAM/NAND)",
+    "005930.KS": "Samsung — HBM/DRAM/NAND + foundry (KRW)",
+    "000660.KS": "SK Hynix — HBM leader (KRW)",
+    "285A.T": "Kioxia — NAND (JPY)",
+    "TSM": "TSMC — CoWoS packaging + logic foundry",
+    "ASML": "ASML — EUV litho monopoly",
+    "IFNNY": "Infineon — power-semi leader (ADR)",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Makers:
+    avg_offhi: float | None
+    avg_5d: float | None
+    n: int
+    names: tuple[tuple[str, float, float | None], ...]  # (ticker, off-hi, 5d), worst-first
+
+
+def makers() -> Makers:
+    """The deep-moat supply leaders (memory/packaging/litho/power) — supply-side watch."""
+    rows: list[tuple[str, float, float | None]] = []
+    for t in _MAKERS:
+        try:
+            s = _close(t, "6mo").dropna()
+            off = float(s.iloc[-1] / s.tail(63).max() - 1)
+            d5 = float(s.iloc[-1] / s.iloc[-6] - 1) if len(s) > 5 else None
+            rows.append((t, off, d5))
+        except Exception:
+            continue
+    rows.sort(key=lambda r: r[1])
+    offs = [o for _, o, _ in rows]
+    d5s = [d for _, _, d in rows if d is not None]
+    return Makers(
+        avg_offhi=(sum(offs) / len(offs)) if offs else None,
+        avg_5d=(sum(d5s) / len(d5s)) if d5s else None,
+        n=len(rows),
+        names=tuple(rows),
+    )
+
+
 # ---------- AI ROI coverage (the Clock-A numerator) ----------
 # The blind spot: ai_demand() tracks the PRICE side (intelligence commoditizing —
 # the Jevons denominator). This tracks the REVENUE side — lab ARR run-rates vs
@@ -1326,6 +1373,75 @@ def distribution() -> Distribution:
     )
 
 
+# ---------- labor (jobs — the consumer's income engine + the AI-substitution tell) ----------
+# Jobs are where two threads meet: (1) the consumer demand base (Clock A) runs on
+# wage income, so a softening labor market erodes it; (2) AI substitution, if real,
+# shows up here first as tech layoffs. The Sahm rule is the cleanest recession
+# trigger (unemployment momentum); JOLTS quits = worker confidence; tech-sector
+# employment YoY = the AI-substitution tell. All free FRED.
+_LABOR_SERIES = {
+    "unrate": ("UNRATE", 12),  # unemployment rate, %
+    "payems": ("PAYEMS", 1),  # nonfarm payrolls level (MoM diff = job adds)
+    "claims": ("CCSA", 4),  # continued claims (level)
+    "openings": ("JTSJOL", 12),  # job openings (JOLTS), thousands
+    "quits": ("JTSQUR", 12),  # quits rate (JOLTS), %
+    "sahm": ("SAHMREALTIME", 1),  # Sahm-rule recession indicator
+    "tech": ("CES6054150001", 12),  # computer-systems-design employment (tech proxy)
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Labor:
+    unrate: float | None  # %
+    unrate_chg: float | None  # vs ~1yr, pp
+    payrolls_mom: float | None  # MoM change in payrolls, thousands
+    quits: float | None  # quits rate, %
+    openings: float | None  # job openings, thousands
+    sahm: float | None  # Sahm-rule value (triggers recession call at >=0.5)
+    tech_yoy: float | None  # tech-sector employment YoY (AI-substitution tell)
+    continued_claims: float | None  # level
+    stale: tuple[str, ...]
+
+    @property
+    def band(self) -> str:
+        if self.sahm is not None and self.sahm >= 0.50:
+            return "recession signal"
+        if self.sahm is not None and self.sahm >= 0.30:
+            return "softening"
+        return "firm"
+
+
+def labor() -> Labor:
+    """The labor market — Sahm trigger, JOLTS, tech-employment — from FRED, cached."""
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    stale: list[str] = []
+    for key, (sid, per) in _LABOR_SERIES.items():
+        latest, prior, is_stale = _fred_metric(sid, per)
+        vals[key] = (latest, prior)
+        if is_stale:
+            stale.append(sid)
+
+    def _diff(key: str) -> float | None:
+        latest, prior = vals[key]
+        return (latest - prior) if (latest is not None and prior is not None) else None
+
+    def _yoy(key: str) -> float | None:
+        latest, prior = vals[key]
+        return (latest / prior - 1) if (latest and prior) else None
+
+    return Labor(
+        unrate=vals["unrate"][0],
+        unrate_chg=_diff("unrate"),
+        payrolls_mom=_diff("payems"),
+        quits=vals["quits"][0],
+        openings=vals["openings"][0],
+        sahm=vals["sahm"][0],
+        tech_yoy=_yoy("tech"),
+        continued_claims=vals["claims"][0],
+        stale=tuple(stale),
+    )
+
+
 def fred_health() -> list[tuple[str, str, str]]:
     """Ping every FRED series the brief depends on; (series_id, status, detail). The
     pipeline validator — `uv run python -m degen.macro fred`."""
@@ -1543,6 +1659,14 @@ def main() -> None:
             print(f"  [{mark}] {sid:14} {detail}")
         ok = sum(1 for _, s, _ in rows if s == "ok")
         print(f"  → {ok}/{len(rows)} series live")
+        return
+    if "makers" in sys.argv[1:]:
+        m = makers()
+        avg = f"{m.avg_offhi:+.1%}" if m.avg_offhi is not None else "—"
+        print(f"=== bottleneck makers  avg {avg} off-hi (n={m.n}) ===")
+        for t, off, d5 in m.names:
+            d5s = f"{d5:+6.1%}" if d5 is not None else "   —  "
+            print(f"  {t:11} off-hi {off:+6.1%}  5d {d5s}   {_MAKERS.get(t, '')}")
         return
     if "neocloud" in sys.argv[1:]:
         nc = neocloud()

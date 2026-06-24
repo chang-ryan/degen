@@ -17,6 +17,7 @@ from degen.macro import (
     CryptoCredit,
     Distribution,
     FundingStress,
+    Labor,
     Neocloud,
     PrivateCredit,
     RoiCoverage,
@@ -140,6 +141,20 @@ def test_neocloud_bands() -> None:
     assert _neo(-0.09).band == "stressed"  # live: bifurcated, avg ~-9%
     assert _neo(-0.03).band == "calm"
     assert Neocloud(None, None, 0, 0, ()).band == "n/a"
+
+
+def _labor(sahm: float | None) -> Labor:
+    return Labor(
+        unrate=4.3, unrate_chg=0.2, payrolls_mom=80.0, quits=1.9, openings=7618.0,
+        sahm=sahm, tech_yoy=-0.01, continued_claims=1810000.0, stale=(),
+    )
+
+
+def test_labor_sahm_bands() -> None:
+    assert _labor(0.10).band == "firm"  # live
+    assert _labor(0.30).band == "softening"
+    assert _labor(0.55).band == "recession signal"  # Sahm triggered
+    assert _labor(None).band == "firm"  # no signal → not flagged
 
 
 def test_mtok_pricing_conversion() -> None:

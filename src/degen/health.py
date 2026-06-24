@@ -46,6 +46,16 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         c = macro.consumer_health()
         return f"{c.resolved}/{c.total} live, gap {c.gap:+.1%}" if c.gap is not None else "no gap"
 
+    def labor() -> str:
+        lab = macro.labor()
+        s = f"{lab.sahm:.2f}" if lab.sahm is not None else "—"
+        return f"U {lab.unrate:.1f}%, Sahm {s} [{lab.band}]" if lab.unrate is not None else "n/a"
+
+    def makers() -> str:
+        m = macro.makers()
+        a = f"{m.avg_offhi:+.0%}" if m.avg_offhi is not None else "—"
+        return f"{m.n} live, avg {a} off-hi" if m.n else "n/a"
+
     def distribution() -> str:
         d = macro.distribution()
         if d.gap is None:
@@ -110,6 +120,8 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         ("yfinance — cross-asset", cross),
         ("FRED — regime series", fred_regime),
         ("FRED — consumer series", consumer),
+        ("FRED — labor (Sahm/JOLTS)", labor),
+        ("makers (foreign tickers)", makers),
         ("FRED — distribution series", distribution),
         ("CNN — Fear & Greed", fng),
         ("OpenRouter — ai_demand", ai),

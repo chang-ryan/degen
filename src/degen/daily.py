@@ -463,6 +463,41 @@ def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
     return out
 
 
+def _labor_block(lab: macro.Labor) -> list[str]:
+    def p(x: float | None, fmt: str = "+.1f") -> str:
+        return format(x, fmt) if x is not None else "—"
+
+    ur = f"{lab.unrate:.1f}% ({p(lab.unrate_chg, '+.1f')}pp/yr)" if lab.unrate is not None else "—"
+    sahm = f"{lab.sahm:.2f}" if lab.sahm is not None else "—"
+    pm = f"{lab.payrolls_mom:+,.0f}k" if lab.payrolls_mom is not None else "—"
+    op = f"{lab.openings:,.0f}k" if lab.openings is not None else "—"
+    q = f"{lab.quits:.1f}%" if lab.quits is not None else "—"
+    tech = f"{lab.tech_yoy:+.1%}" if lab.tech_yoy is not None else "—"
+    out = [
+        f"  unemployment : {ur}   Sahm rule {sahm} [{lab.band}]  (>=0.50 = recession trigger)",
+        f"  payrolls     : {pm}/mo   openings {op}   quits {q} (low = workers not confident)",
+        f"  tech jobs    : computer-systems-design {tech} YoY  — the AI-substitution tell",
+        "  read: jobs = the consumer income engine (Clock A) + where AI substitution shows up "
+        "first. Sahm rising / tech-jobs rolling = the K-shape biting labor → consumer → credit.",
+    ]
+    if lab.stale:
+        out.append(f"  [stale: {','.join(lab.stale)}]")
+    return out
+
+
+def _makers_block(m: macro.Makers) -> list[str]:
+    if m.n == 0:
+        return ["  makers: n/a"]
+    avg = f"{m.avg_offhi:+.1%}" if m.avg_offhi is not None else "—"
+    names = "  ".join(f"{t.split('.')[0]} {o:+.0%}" for t, o, _ in m.names)
+    return [
+        f"  bottleneck     : avg {avg} off-hi (n={m.n})  — deep-moat supply leaders",
+        f"  names          : {names}",
+        "  read: memory/packaging/litho/power oligopoly (Samsung/Hynix/TSMC/ASML/Infineon/MU). "
+        "Price-maker on margin, price-taker on demand — leveraged to capex. `macro makers` = full.",
+    ]
+
+
 def _distribution_block(d: macro.Distribution) -> list[str]:
     def p(x: float | None, fmt: str = "+.1%") -> str:
         return format(x, fmt) if x is not None else "—"
@@ -750,7 +785,9 @@ def build_brief(
     mem = macro.memory_prices()
     memtape = macro.memory_tape()
     cons = macro.consumer_health()
+    lab = macro.labor()
     dist = macro.distribution()
+    mkrs = macro.makers()
     froth = macro.retail_froth()
     attn = macro.retail_attention()
     aid = ai_demand()
@@ -780,6 +817,10 @@ def build_brief(
         "## Consumer (the demand base that funds AI)",
         "```",
         *_consumer_block(cons),
+        "```",
+        "## Labor (jobs — Clock A income engine + AI-substitution tell)",
+        "```",
+        *_labor_block(lab),
         "```",
         "## Distribution (who gets the productivity gains)",
         "```",
@@ -830,6 +871,10 @@ def build_brief(
         "## Memory super-cycle (price-hike tracker)",
         "```",
         *_memory_block(mem, memtape),
+        "```",
+        "## Bottleneck makers (deep-moat supply leaders)",
+        "```",
+        *_makers_block(mkrs),
         "```",
         "## Mag7 — concentration",
         "```",
