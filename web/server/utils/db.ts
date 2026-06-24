@@ -3,9 +3,12 @@
 //   • otherwise                               → read the local SQLite file (dev).
 // The frontend and the panel shape never change; only the source does.
 import { dirname, resolve } from 'node:path'
-import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+// NOTE: do NOT `import process from 'node:process'` here — Nitro/unenv already
+// injects `process` as a global in the server bundle, and an explicit import is a
+// duplicate declaration that crashes the Vercel runtime ("Identifier 'process'
+// has already been declared"). Use the global directly.
 const SUPABASE_URL = process.env.SUPABASE_URL
 // new-format publishable key (sb_publishable_*); falls back to the legacy anon key.
 const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY
