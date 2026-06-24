@@ -66,6 +66,11 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         d = f"{cs.dispersion:.1f}pp" if cs.dispersion is not None else "—"
         return f"CCC {cs.ccc_oas:.1f}% disp {d} [{cs.band}]" if cs.ccc_oas is not None else "n/a"
 
+    def funding() -> str:
+        f = macro.funding_stress()
+        si = f"{f.sofr_iorb * 100:+.0f}bp" if f.sofr_iorb is not None else "—"
+        return f"SOFR-IORB {si}, RRP ${f.rrp:,.0f}B [{f.band}]" if f.sofr is not None else "n/a"
+
     def ai() -> str:
         d = ai_demand.ai_demand()
         return f"{d.model_count} models, frontier ${d.frontier_cheapest:.2f}/Mtok" if d else "n/a"
@@ -100,6 +105,7 @@ def _checks() -> list[tuple[str, Callable[[], str]]]:
         ("OpenRouter — ai_demand", ai),
         ("crypto-credit (STRC/MSTR)", crypto),
         ("credit stress (ladder/edge)", credit),
+        ("funding plumbing (repo/RRP)", funding),
         ("Wikipedia — SPX list", spx),
         ("SEC EDGAR — resolve", edgar_resolve),
         ("X syndication — fetch", xpost),

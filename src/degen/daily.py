@@ -367,7 +367,7 @@ def _credit_stress_block(c: macro.CreditStress) -> list[str]:
     out = [
         f"  quality ladder : IG {pct(c.ig_oas)}  BB {pct(c.bb_oas)}  HY {pct(c.hy_oas)}  "
         f"CCC {pct(c.ccc_oas)}{cccc}",
-        f"  dispersion     : CCC−IG {disp}  [{c.band}]  (wide = stress stuck at the bottom)",
+        f"  dispersion     : CCC-IG {disp}  [{c.band}]  (wide = stress stuck at the bottom)",
         f"  levered edge   : private-credit/BDC {p(c.bdc_offhi)} off-hi ({p(c.bdc_5d)}/5d) · "
         f"loans {p(c.loans_offhi)} · banks {p(c.banks_offhi)} off-hi",
         "  read: CCC + private credit cracking while IG/banks calm = early/confined. IG "
@@ -376,6 +376,23 @@ def _credit_stress_block(c: macro.CreditStress) -> list[str]:
     if c.stale:
         out.append(f"  [stale: {','.join(c.stale)}]")
     return out
+
+
+def _funding_stress_block(f: macro.FundingStress) -> list[str]:
+    si = f"{f.sofr_iorb * 100:+.0f}bp" if f.sofr_iorb is not None else "—"
+    sofr = f"{f.sofr:.2f}%" if f.sofr is not None else "—"
+    iorb = f"{f.iorb:.2f}%" if f.iorb is not None else "—"
+    rrp = f"${f.rrp:,.0f}B" if f.rrp is not None else "—"
+    rrpc = f" ({f.rrp_chg:+,.0f}B/mo)" if f.rrp_chg is not None else ""
+    res = f"${f.reserves / 1000:.2f}T" if f.reserves is not None else "—"
+    resc = f" ({f.reserves_chg:+,.0f}B/mo)" if f.reserves_chg is not None else ""
+    return [
+        f"  SOFR-IORB    : {si}  (SOFR {sofr} vs IORB {iorb})  — >+5bp = repo stress",
+        f"  RRP buffer   : {rrp}{rrpc}  — near-zero = QT now drains reserves directly",
+        f"  bank reserves: {res}{resc}  — toward the ~$3T scarcity zone = funding tightens",
+        f"  read: [{f.band}] — plumbing leak is a different failure mode than spreads; "
+        "SOFR spiking >IORB = the 2019-repo channel. Pairs with credit_stress.",
+    ]
 
 
 def _consumer_block(c: macro.ConsumerHealth) -> list[str]:
@@ -697,6 +714,7 @@ def build_brief(
     cta = macro.cta()
     cc = macro.crypto_credit()
     creds = macro.credit_stress()
+    funding = macro.funding_stress()
     mem = macro.memory_prices()
     memtape = macro.memory_tape()
     cons = macro.consumer_health()
@@ -756,6 +774,10 @@ def build_brief(
         "## Credit stress (Clock B — quality ladder + levered edge)",
         "```",
         *_credit_stress_block(creds),
+        "```",
+        "## Funding plumbing (Clock B — repo / liquidity)",
+        "```",
+        *_funding_stress_block(funding),
         "```",
         "## AI-infra demand (commoditization)",
         "```",

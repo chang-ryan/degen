@@ -11,7 +11,14 @@ import importlib.util
 import pathlib
 
 from degen.ai_demand import _mtok
-from degen.macro import ConsumerHealth, CreditStress, CryptoCredit, Distribution, RoiCoverage
+from degen.macro import (
+    ConsumerHealth,
+    CreditStress,
+    CryptoCredit,
+    Distribution,
+    FundingStress,
+    RoiCoverage,
+)
 
 
 def _cc(strc: float | None) -> CryptoCredit:
@@ -94,6 +101,19 @@ def test_credit_stress_bands() -> None:
     assert _credit(1.20, 9.47, -0.079, 0.0).band == "spreading (quality/banks)"  # IG widened
     assert _credit(0.74, 9.47, -0.02, -0.10).band == "spreading (quality/banks)"  # banks broke
     assert _credit(0.74, 5.0, -0.01, 0.0).band == "calm"  # tight dispersion, edge fine
+
+
+def _funding(sofr_iorb: float, rrp: float) -> FundingStress:
+    return FundingStress(
+        sofr=3.61, iorb=3.61 - sofr_iorb, sofr_iorb=sofr_iorb, rrp=rrp, rrp_chg=None,
+        reserves=3033.0, reserves_chg=None, stale=(),
+    )
+
+
+def test_funding_stress_bands() -> None:
+    assert _funding(-0.04, 6.5).band == "buffer drained"  # live: RRP gone, no repo stress
+    assert _funding(0.08, 6.5).band == "repo stress"  # SOFR firmly over IORB
+    assert _funding(-0.04, 400.0).band == "ample"  # buffer intact, repo calm
 
 
 def test_mtok_pricing_conversion() -> None:

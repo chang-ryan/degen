@@ -954,6 +954,70 @@ def credit_stress() -> CreditStress:
     )
 
 
+# ---------- funding plumbing (Clock B — the repo / liquidity channel) ----------
+# A different failure mode than credit spreads: the money-market plumbing. SOFR
+# spiking above IORB = repo stress (the Sept-2019 blowup). RRP near zero = the
+# liquidity buffer that's absorbed QT is exhausted, so further tightening drains
+# *reserves* directly; reserves toward the ~$3T "scarcity zone" = funding gets
+# tight. Slow/systemic, all free FRED — the classic place a systemic crack shows.
+
+_FUNDING_SERIES = {
+    "sofr": ("SOFR", 21),  # secured overnight financing rate, %
+    "iorb": ("IORB", 21),  # interest on reserve balances, % (the floor)
+    "rrp": ("RRPONTSYD", 21),  # overnight reverse repo, $B (the buffer)
+    "reserves": ("WRESBAL", 4),  # bank reserves, $millions (weekly)
+}
+
+
+@dataclass(frozen=True, slots=True)
+class FundingStress:
+    sofr: float | None  # %
+    iorb: float | None  # %
+    sofr_iorb: float | None  # SOFR minus IORB, pp (>0 = repo paying up = stress)
+    rrp: float | None  # $B (near 0 = buffer drained)
+    rrp_chg: float | None  # vs ~1mo, $B
+    reserves: float | None  # $B
+    reserves_chg: float | None  # vs ~1mo, $B (draining = tightening)
+    stale: tuple[str, ...]
+
+    @property
+    def band(self) -> str:
+        if self.sofr_iorb is not None and self.sofr_iorb > 0.05:  # SOFR >5bp over IORB
+            return "repo stress"
+        if self.rrp is not None and self.rrp < 50:  # buffer effectively gone
+            return "buffer drained"
+        return "ample"
+
+
+def funding_stress() -> FundingStress:
+    """Money-market plumbing — repo (SOFR-IORB) + the RRP/reserves liquidity buffer."""
+    vals: dict[str, tuple[float | None, float | None]] = {}
+    stale: list[str] = []
+    for key, (sid, per) in _FUNDING_SERIES.items():
+        latest, prior, is_stale = _fred_metric(sid, per)
+        vals[key] = (latest, prior)
+        if is_stale:
+            stale.append(sid)
+
+    sofr, iorb = vals["sofr"][0], vals["iorb"][0]
+    sofr_iorb = (sofr - iorb) if (sofr is not None and iorb is not None) else None
+    rrp_latest, rrp_prior = vals["rrp"]
+    res_latest, res_prior = vals["reserves"]
+    res_b = (res_latest / 1000) if res_latest is not None else None  # $millions → $B
+    res_chg = ((res_latest - res_prior) / 1000) if (res_latest and res_prior) else None
+
+    return FundingStress(
+        sofr=sofr,
+        iorb=iorb,
+        sofr_iorb=sofr_iorb,
+        rrp=rrp_latest,
+        rrp_chg=(rrp_latest - rrp_prior) if (rrp_latest and rrp_prior) else None,
+        reserves=res_b,
+        reserves_chg=res_chg,
+        stale=tuple(stale),
+    )
+
+
 # ---------- consumer health (the demand base that ultimately funds AI) ----------
 # Almost every AI-funding dollar traces back to the consumer (ad rev, retail) or to
 # capital markets (the untethered, fragile part). This panel instruments the consumer
