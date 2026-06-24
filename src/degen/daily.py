@@ -481,9 +481,8 @@ def _labor_block(lab: macro.Labor) -> list[str]:
         f"  unemployment : {ur}   Sahm rule {sahm} [{lab.band}]  (>=0.50 = recession trigger)",
         f"  payrolls     : {pm}/mo   openings {op}   quits {q} (low = workers not confident)",
         f"  tech jobs    : IT-services employment {tech} YoY  — substitution *hint* (not proof)",
-        "  read: jobs = the consumer income engine (Clock A). Sahm rising = the K-shape biting "
-        "labor → consumer → credit. Tech line is IT-services (CES6054150001): a falling print is "
-        "indistinguishable from offshoring / a plain tech-capex slowdown — read it as a hint.",
+        f"  read: {macro.Labor.SCOPE} "
+        "Sahm rising / tech rolling = K-shape biting labor → consumer → credit.",
     ]
     if lab.stale:
         out.append(f"  [stale: {','.join(lab.stale)}]")
@@ -499,9 +498,7 @@ def _makers_block(m: macro.Makers) -> list[str]:
     return [
         f"  complex        : avg {avg} off-hi{ex} (n={m.n})  — semicap/memory oligopoly",
         f"  names          : {names}",
-        "  read: memory/packaging/litho/power oligopoly (Samsung/Hynix/TSMC/ASML/Infineon/MU). "
-        "This is EQUITY-BETA health (de-beta'd vs SPY), NOT supply tightness — it can't see CoWoS "
-        "lead times / HBM allocation (no free feed). `macro makers` = full.",
+        f"  read: {macro.Makers.SCOPE}  `macro makers` = full.",
     ]
 
 
